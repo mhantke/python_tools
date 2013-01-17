@@ -1,4 +1,4 @@
-import numpy,pylab,os,re,csv,string,Image,spimage
+import numpy,pylab,os,re,csv,string
 
 # in_filter can be a string or a list of strings
 def get_filenames(in_filter=None,path="./"):
@@ -37,6 +37,7 @@ def estimate_type(var):
                                       % (var, type(var)))
 
 def png_mask_to_h5(filename,Nx,Ny):
+    import Image,spimage
     I = Image.open(filename)
     D = pylab.array(I.getdata())[:,0]
     D=D.reshape((Nx,Ny))
@@ -46,6 +47,7 @@ def png_mask_to_h5(filename,Nx,Ny):
     spimage.sp_image_free(img)
 
 def get_png_mask(filename):
+    import Image
     I = Image.open(filename)
     D = pylab.array(I.getdata())[:,0]
     D = D.reshape((I.size[1],I.size[0]))
@@ -196,5 +198,3 @@ def smooth(x,window_len=11,window='hanning'):
     y=numpy.convolve(w/w.sum(),s,mode='same')
     return y[window_len:-window_len+1] 
 
-def downsample_position(position,downsampling):
-    return (position-(downsampling-1)/2.)/(1.*downsampling)
