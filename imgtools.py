@@ -110,14 +110,14 @@ def gaussian_smooth(I,sm):
         Y -= (N-1)/2.
         R = pylab.sqrt(X**2 + Y**2)
         kernel = pylab.exp(R**2/(1.0*sm**2))
-        Ism = scipy.signal.convolve2d(I,kernel,mode='same',boundary='fill')
+        Ism = scipy.signal.convolve2d(I,pylab.fftshift(kernel),mode='same',boundary='fill')
         return Ism
     elif len(I.shape) == 1:
         kernel = pylab.zeros(1+2*sm)
         X = pylab.arange(0,N,1)
         X -= (N-1)/2.
         kernel = pylab.exp(X**2/(1.0*sm**2))
-        Ism = pylab.convolve(I,kernel,mode='full')
+        Ism = pylab.convolve(I,pylab.fftshift(kernel),mode='full')
         return Ism
 
 def gaussian_smooth_2d1d(I,sm):
