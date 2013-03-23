@@ -198,3 +198,127 @@ def smooth(x,window_len=11,window='hanning'):
     y=numpy.convolve(w/w.sum(),s,mode='same')
     return y[window_len:-window_len+1] 
 
+gaussian = lambda x,A0,x0,sigma: A0*pylab.exp((-(x-x0)**2)/(2.*sigma**2))
+double_gaussian = lambda x,p1,p2: gaussian(x,p1[0],p1[1],p1[2])+gaussian(x,p2[0],p2[1],p2[2])
+
+def double_gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
+    from scipy.optimize import leastsq
+
+    if xdata == None and ydata == None:
+        # generate test data
+        A01,A02 = 7.5,10.4
+        mean1, mean2 = -5, 4.
+        std1, std2 = 7.5, 4. 
+        xdata =  pylab.linspace(-20, 20, 500)
+        ydata = double_gaussian(xdata,[A01,mean1,std1],[A02,mean2,std2])
+
+    if p_init == None:
+        p_A01, p_A02, p_mean1, p_mean2, p_sd1, p_sd2  = [ydata.max(),
+                                                         ydata.max(),
+                                                         xdata[len(xdata)/3],
+                                                         xdata[2*len(xdata)/3],
+                                                         (xdata.max()-xdata.min())/10.,
+                                                         (xdata.max()-xdata.min())/10.]
+        p_init = [p_A01, p_mean1, p_sd1,p_A02, p_mean2, p_sd2] # Initial guesses for leastsq
+    else:
+        [p_A01, p_mean1, p_sd1,p_A02, p_mean2, p_sd2] = p_init # Initial guesses for leastsq
+
+    err = lambda p,x,y: abs(y-double_gaussian(x,[p[0],p[1],p[2]],[p[3],p[4],p[5]]))
+
+    plsq = leastsq(err, p_init, args = (xdata, ydata))
+
+    p_result = [[A1, mean1, s1], [A2, mean2, s2]] = [[plsq[0][0],plsq[0][1],plsq[0][2]],[plsq[0][3],plsq[0][4],plsq[0][5]]]
+    yest = double_gaussian(xdata,p_result[0],p_result[1])
+
+    if show:
+        pylab.figure()
+        yinit = double_gaussian(xdata,[p_A01,p_mean1,p_sd1],[p_A02,p_mean2,p_sd2])
+        yest1 = gaussian(xdata,plsq[0][0],plsq[0][1],plsq[0][2])
+        yest2 = gaussian(xdata,plsq[0][3],plsq[0][4],plsq[0][5])
+        pylab.plot(xdata, ydata, 'r.',color='red', label='Data')
+        pylab.plot(xdata, yinit, 'r.',color='blue', label='Starting Guess')
+        pylab.plot(xdata, yest, '-',lw=3.,color='black', label='Fitted curve (2 gaussians)')
+        pylab.plot(xdata, yest1, '--',lw=1.,color='black', label='Fitted curve (2 gaussians)')
+        pylab.plot(xdata, yest2, '--',lw=1.,color='black', label='Fitted curve (2 gaussians)')
+        pylab.legend()
+        pylab.show()
+        
+    return [p_result, yest]
+
+def gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
+    from scipy.optimize import leastsq
+    
+    if xdata == None and ydata == None:
+        # Generate test data
+        A0_test = 5.5
+        x0_test = -2.
+        s_test = 1. 
+        xdata =  pylab.linspace(-20., 20., 500)
+        ydata = gaussian(xdata,A0_test,x0_test,s_test)
+
+    if p_init == None:
+        # Guess parameters
+        A0_init, x0_init, s_init  = [ydata.max(),
+                                     xdata[len(xdata)/2].mean(),
+                                     (xdata.max()-xdata.min())/10.]
+        p_init = [A0_init, x0_init, s_init]
+    else:
+        [A0_init, x0_init, s_init] = p_init
+
+    err = lambda p,x,y: abs(y-gaussian(x,p[0],p[1],p[2]))
+    plsq = leastsq(err, p_init, args = (xdata, ydata))
+
+    p_result = [A0_result, x0_result, s_result] = [plsq[0][0],plsq[0][1],plsq[0][2]]
+    yest = gaussian(xdata,A0_result, x0_result, s_result)
+
+    if show:
+        pylab.figure()
+        yinit = gaussian(xdata,A0_init, x0_init, s_init)
+        pylab.plot(xdata, ydata, 'r.',color='red', label='Data')
+        pylab.plot(xdata, yinit, 'r.',color='blue', label='Starting Guess')
+        pylab.plot(xdata, yest, '-',lw=3.,color='black', label='Fitted curve')
+        pylab.legend()
+        pylab.show()
+        
+    return [p_result, yest]
+
+
+def my_imsave(fname, arr, **kwargs):
+
+    from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+    from matplotlib.figure import Figure
+    from matplotlib.colors import ColorConverter as CC
+    C = CC()
+    
+    if pylab.isinteractive():
+        i_was_on = True
+        pylab.ioff()
+    else:
+        i_was_on = False
+        
+    fig = Figure(figsize=arr.shape[::-1], dpi=1, frameon=False)
+    canvas = FigureCanvas(fig)
+
+    if 'background' in kwargs.keys():
+        [r,g,b] = C.to_rgb(kwargs['background'])
+        BG = pylab.ones(shape=(arr.shape[0],arr.shape[1],3))
+        BG[:,:,0] = r
+        BG[:,:,1] = g
+        BG[:,:,2] = b
+        fig.figimage(BG)
+
+    fig.figimage(arr,
+                 xo = kwargs.get('xo',0),
+                 yo = kwargs.get('yo',0),
+                 alpha = kwargs.get('alpha',None),
+                 norm = kwargs.get('norm',None),
+                 cmap = kwargs.get('cmap',None),
+                 vmin = kwargs.get('vmin',None),
+                 vmax = kwargs.get('vmax',None),
+                 origin = kwargs.get('origin',None))
+    
+    fig.savefig(fname,
+                dpi=1,
+                format = kwargs.get('format',None))
+    if i_was_on:
+        pylab.ion()

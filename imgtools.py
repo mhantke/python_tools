@@ -42,6 +42,28 @@ def cone_pixel_average(image,N_theta,cx=None,cy=None):
             values[j,i] = temp.mean()
     return [radii,values]
 
+def cone_pixel_average_new(image,mask,N_theta,cx=None,cy=None,rdownsample=1):
+    [R,Theta] = get_R_and_Theta_map(image.shape[1],image.shape[0],cx,cy)
+    radii = pylab.arange(0,R.max()+1,1*rdownsample)
+    values = pylab.zeros(shape=(N_theta,len(radii)))
+    Mvalues = pylab.zeros(shape=(N_theta,len(radii)))
+    for j in range(0,N_theta):
+        theta_min = j/(1.0*N_theta)*2.0*pylab.pi
+        theta_max = (j+1)/(1.0*N_theta)*2.0*pylab.pi
+        theta_center = (theta_max+theta_min)/2.0
+        theta_interval = theta_max-theta_min
+        Mtheta =abs(Theta-theta_center)<=theta_interval/2.0
+        Mtheta *= mask
+        if Mtheta.sum() > 0:
+            theta_image = image[Mtheta]
+            theta_R = R[Mtheta]
+            for i in range(0,len(radii)):
+                m = abs(theta_R-radii[i])<=0.5*rdownsample
+                if m.sum() > 0:
+                    values[j,i] = theta_image[m].mean()
+                    Mvalues[j,i] = 1
+    return [values,Mvalues]
+
 def radial_pixel_sum(image,cx=None,cy=None):
     if not cx:
         cx = (image.shape[1]-1)/2.0
@@ -636,3 +658,74 @@ def recenter(I,cx,cy):
 
 def downsample_position(position,downsampling):
     return (position-(downsampling-1)/2.)/(1.*downsampling)
+
+def angular_correlation(I,M,cx,cy,N_theta,rdownsample=1,outfolder='',filename=''):
+    [Ipolar,Mpolar] = cone_pixel_average_new(I,M,N_theta,cx,cy,rdownsample)
+    pylab.imsave('%s/%s_rimg.png' % (outfolder,filename[:-3]),(Ipolar)*pylab.log10(10*Mpolar))
+    Cpolar = pylab.zeros(shape=(N_theta,Mpolar.shape[1]))
+    Npolar = pylab.zeros(shape=(N_theta,Mpolar.shape[1]))
+    for r in range(Mpolar.shape[1]):
+        for t in range(Mpolar.shape[0]):
+            V1 = Ipolar[t,r]
+            if Mpolar[t,r] == 1:
+                for dt in range(Mpolar.shape[0]):
+                    if Mpolar[(t+dt)%N_theta,r] == 1:
+                        V2 = Ipolar[(t+dt)%N_theta,r]
+                        Cpolar[dt,r] += V1*V2
+                        Npolar[dt,r] += 1
+    Cpolar /= 1.*Npolar
+    return Cpolar
+
+def test_angular_correlation():
+    if False:
+        N = 100
+        c = 49.5
+        X,Y = pylab.meshgrid(pylab.arange(N),pylab.arange(N))
+        X -= c
+        Y -= c
+        R = pylab.sqrt(X**2+Y**2)
+        img = pylab.zeros_like(R)
+        img[abs(X)<4.] = 1.
+        img[abs(Y)<4.] = 1.
+        msk = pylab.ones_like(img)
+        C = angular_correlation(img,msk,c,c,101)
+    if False:
+        import propagator as p
+        I = p.Input()
+        I.detector.init_mask(Nx=1024,
+                             Ny=1024,
+                             y_gap_size_in_pixel=23,
+                             x_gap_size_in_pixel=0,
+                             hole_diameter_in_pixel=70)
+        I.propagation.rs_oversampling = 2.
+        I.set_sample_icosahedral_virus_map(225E-09)
+        I.sample.set_random_orientation()
+        O = p.propagator(I)
+        img = pylab.poisson(O.get_intensity_pattern())
+        msk = I.detector.mask
+        C = angular_correlation(img,msk,I.detector.cx,I.detector.cy,31)
+        rmin = (pylab.arange(C.shape[1])[pylab.isfinite(C.sum(0))])[0]
+        rmax = (pylab.arange(C.shape[1])[pylab.isfinite(C.sum(0))])[-1]
+        C = C[:,rmin:rmax+1]
+    if True:
+        import spimage as s
+        fn = '/disk2/LCLS201207_extension/alphas128/r0121/LCLS_2012_Jul22_r0121_220004_45bf_preprocessed.h5'
+        I = s.sp_image_read(fn,0)
+        img = I.image.real.copy()
+        msk = I.mask.copy()
+        #print I.detector.image_center[0],I.detector.image_center[1]
+        #print img[msk==1]
+        per = pylab.percentile(img[msk==1],80.)
+        #print per
+        img = pylab.array(img>per,dtype='float')
+        C = angular_correlation(img,msk,I.detector.image_center[0],I.detector.image_center[1],31)
+        rmin = (pylab.arange(C.shape[1])[pylab.isfinite(C.sum(0))])[0]
+        rmax = (pylab.arange(C.shape[1])[pylab.isfinite(C.sum(0))])[-1]
+        C = C[:,rmin:rmax+1]
+    #print C
+    pylab.clf()
+    pylab.plot(C.sum(1))
+    pylab.savefig('test_Cpolar.png')
+    pylab.imsave('C.png',C)
+    pylab.imsave('img.png',img)
+    pylab.imsave('msk.png',msk)
