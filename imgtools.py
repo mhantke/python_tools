@@ -14,7 +14,7 @@ def get_R_and_Theta_map(Nx,Ny,cx=None,cy=None):
     X,Y = pylab.meshgrid(x,y)
     R = pylab.sqrt(X**2+Y**2)
     R = R.round()
-    Theta = pylab.arctan(-Y/X)
+    Theta = pylab.arctan(-Y/(X+finfo('float64').eps))
     Theta[X<0] += pylab.pi
     Theta += pylab.pi/2.0
     #pylab.imsave("Theta.png" , Theta)

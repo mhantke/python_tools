@@ -283,7 +283,9 @@ def gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
     return [p_result, yest]
 
 
-def my_imsave(fname, arr, **kwargs):
+def my_imsave(fname, arr, **kwargs): imsave(fname, arr, **kwargs)
+
+def imsave(fname, arr, **kwargs):
 
     from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
     from matplotlib.figure import Figure
@@ -300,12 +302,13 @@ def my_imsave(fname, arr, **kwargs):
     canvas = FigureCanvas(fig)
 
     if 'background' in kwargs.keys():
-        [r,g,b] = C.to_rgb(kwargs['background'])
-        BG = pylab.ones(shape=(arr.shape[0],arr.shape[1],3))
-        BG[:,:,0] = r
-        BG[:,:,1] = g
-        BG[:,:,2] = b
-        fig.figimage(BG)
+        if kwargs['background'] != 'transparent':
+            [r,g,b] = C.to_rgb(kwargs['background'])
+            BG = pylab.ones(shape=(arr.shape[0],arr.shape[1],3))
+            BG[:,:,0] = r
+            BG[:,:,1] = g
+            BG[:,:,2] = b
+            fig.figimage(BG)
 
     fig.figimage(arr,
                  xo = kwargs.get('xo',0),
