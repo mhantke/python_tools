@@ -14,7 +14,7 @@ def get_R_and_Theta_map(Nx,Ny,cx=None,cy=None):
     X,Y = pylab.meshgrid(x,y)
     R = pylab.sqrt(X**2+Y**2)
     R = R.round()
-    Theta = pylab.arctan(-Y/(X+finfo('float64').eps))
+    Theta = pylab.arctan(-Y/(X+pylab.finfo('float64').eps))
     Theta[X<0] += pylab.pi
     Theta += pylab.pi/2.0
     #pylab.imsave("Theta.png" , Theta)
@@ -139,7 +139,7 @@ def gaussian_smooth(I,sm):
         X = pylab.arange(0,N,1)
         X -= (N-1)/2.
         kernel = pylab.exp(X**2/(1.0*sm**2))
-        Ism = pylab.convolve(I,pylab.fftshift(kernel),mode='full')
+        Ism = pylab.convolve(I,pylab.fftshift(kernel),mode='same')
         return Ism
 
 def gaussian_smooth_2d1d(I,sm):
@@ -355,19 +355,30 @@ def turnccw(array2d):
         array2d_turned[N-x,:] = array2d[:,x].T
     return array2d_turned
 
-def turn180(array2d,cx=None,cy=None):
+def turn180(img,cx=None,cy=None):
     if cx == None and cy == None:
-        array2d_turned = array2d.swapaxes(0,1)
-    else:
-        dcx = cx-(array2d.shape[1]-1)/2.
-        dcy = cy-(array2d.shape[0]-1)/2.
-        array2d_turned = array2d.copy()
-        if dcx >= 0 and dcy >= 0: toturn = array2d_turned[2*dcy:,2*dcx:]
-        elif dcx < 0 and dcy >= 0: toturn = array2d_turned[2*dcy:,:2*dcx]
-        elif dcx >= 0 and dcy < 0: toturn = array2d_turned[:2*dcy,2*dcx:]
-        elif dcx < 0 and dcy < 0: toturn = array2d_turned[:2*dcy,:2*dcx]
-        toturn[:,:] = toturn.swapaxes(0,1)[:,:]
-    return array2d_turned
+        return img.swapaxes(0,1)
+    cx1 = round(cx*2)/2.
+    cy1 = round(cy*2)/2.
+    Nx1 = int(2*min([cx1,img.shape[1]-1-cx1]))+1
+    Ny1 = int(2*min([cy1,img.shape[0]-1-cy1]))+1
+    y_start = int(round(cy1-(Ny1-1)/2.))
+    y_stop = int(round(cy1+(Ny1-1)/2.))+1
+    x_start = int(round(cx1-(Nx1-1)/2.))
+    x_stop = int(round(cx1+(Nx1-1)/2.))+1
+    img_new = pylab.zeros(shape=(img.shape[0],img.shape[1]),dtype=img.dtype)
+    #img_new = img.copy()
+    img_new[y_start:y_stop,x_start:x_stop] = turnccw(turnccw(img[y_start:y_stop,x_start:x_stop]))
+    return img_new
+    
+def test_turn180():
+    outdir = "testout_trun180"
+    os.system("mkdir %s" % outdir)
+    os.system("rm %s/*" % outdir)
+    A = get_test_image()
+    pylab.imsave("%s/image.png" % outdir,A)
+    B = turn180(A,A.shape[1]/3.,2*A.shape[0]/3.)
+    pylab.imsave("%s/image_turned.png" % outdir,B)
 
 def slide(img,dx=0,dy=0):
     if dx == 0 and dy == 0: imgout = img.copy()
@@ -729,3 +740,17 @@ def test_angular_correlation():
     pylab.imsave('C.png',C)
     pylab.imsave('img.png',img)
     pylab.imsave('msk.png',msk)
+
+downsample_position = lambda x,N,binsize: (x-(binsize-1)/2.)*(N/(1.*binsize)-1)/(1.*(N-binsize))
+upsample_position = lambda x,N,binsize: x*(N*binsize-binsize)/(1.*(N-1))+(binsize-1)/2.
+
+def get_test_image():
+    import Image,os
+    filename = os.path.dirname(os.path.realpath(__file__)) + "/testdata/testmax_gray.png"
+    I = Image.open(filename)
+    Nx,Ny = I.size
+    print pylab.array(I.getdata()).shape
+    D = pylab.array(I.getdata())[:]
+    D=D.reshape((Ny,Nx))
+    return D    
+

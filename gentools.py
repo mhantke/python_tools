@@ -325,3 +325,7 @@ def imsave(fname, arr, **kwargs):
                 format = kwargs.get('format',None))
     if i_was_on:
         pylab.ion()
+
+def dict_to_dict(dict_src,dict_dest):
+    for k in dict_src.keys():
+        dict_dest[k] = dict_src[k]
