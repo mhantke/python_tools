@@ -1,8 +1,14 @@
-import os,re,sys,h5py,pylab,numpy,time
+#======================#
+# Python tools - image #
+#======================# 
+#
+# Author: Max Hantke
+# Email: maxhantke@gmail.com
 
+import os,re,sys,h5py,pylab,numpy,time,cmath
 
 def get_phase(x):
-    return abs(pylab.log(x/abs(x))/1.0j)
+    return cmath.phase(x)
 
 def get_R_and_Theta_map(Nx,Ny,cx=None,cy=None):
     if not cx:

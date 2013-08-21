@@ -1,4 +1,11 @@
-import numpy,pylab,os,re,csv,string
+#========================#
+# Python tools - general #
+#========================# 
+#
+# Author: Max Hantke
+# Email: maxhantke@gmail.com
+
+import numpy,pylab,os,re,csv,string,time,datetime
 
 # in_filter can be a string or a list of strings
 def get_filenames(in_filter=None,path="./"):
@@ -329,3 +336,62 @@ def imsave(fname, arr, **kwargs):
 def dict_to_dict(dict_src,dict_dest):
     for k in dict_src.keys():
         dict_dest[k] = dict_src[k]
+
+class Configuration:
+    def __init__(self,config={},default={},verbose=False):
+        self.verbose = verbose
+        
+        if isinstance(config,str):
+            self.read_configfile(config)
+        else:
+            self.confDict = config
+        
+        if isinstance(default,str):
+            defDict = Configuration(default).confDict
+        else:
+            defDict = default
+        self.set_unspecified_to_default(defDict)
+
+    def read_configfile(self,configfile):
+        import ConfigParser
+        config = ConfigParser.ConfigParser()
+        try:
+            f = open(configfile)
+            config.readfp(f)
+        except IOError:
+            print "ERROR: Can't read configuration-file."
+            
+        self.confDict = {}
+        for section in config.sections(): 
+            c = self.confDict[section] = dict(config.items(section))
+            for key in c.keys(): 
+                c[key] = estimate_type(c[key])
+                if '$' in key:
+                    c[key] = os.path.expandvars(c[key])
+        f.close()
+    
+    def set_unspecified_to_default(self,defaultDict):
+        for section in defaultDict.keys():
+            if section not in self.confDict.keys():
+                self.confDict[section] = {}
+                if self.verbose:
+                    print "Add section %s to configuration as it did not exist." % section
+            for variableName in defaultDict[section].keys():
+                if variableName not in self.confDict[section].keys():
+                    self.confDict[section][variableName] = defaultDict[section][variableName]
+                    if self.verbose:
+                        print "Add variable %s with default value %s to configuration section %s as variable did not exist." % (variableName,str(defaultDict[section][variableName]),section)
+    
+                    
+def mkdir_timestamped(dirname):
+    ts = time.time()
+    time_string = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d_%H%M%S')
+    real_dir = dirname+'_'+time_string
+    if real_dir.split("/")[-1] != "":
+        link = real_dir.split("/")[-1]
+    else:
+        link = real_dir.split("/")[-2]
+    os.system('mkdir %s' % real_dir)
+    os.system('rm -f %s' % dirname)
+    os.system('ln -s %s %s' % (link,dirname))
+    return real_dir

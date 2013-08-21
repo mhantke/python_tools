@@ -1,3 +1,10 @@
+#===========================#
+# Python tools - simulation #
+#===========================# 
+#
+# Author: Max Hantke
+# Email: maxhantke@gmail.com
+
 import pylab,math
 
 def random_euler_angles():

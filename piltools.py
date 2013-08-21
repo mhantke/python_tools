@@ -1,3 +1,10 @@
+#====================#
+# Python tools - PIL #
+#====================# 
+#
+# Author: Max Hantke
+# Email: maxhantke@gmail.com
+
 import os,re,sys,spimage,Image
 from pylab import *
 
