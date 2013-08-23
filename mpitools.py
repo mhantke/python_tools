@@ -66,6 +66,14 @@ def multinode_master(comm,Njobs,getwork,logres=None,logger=None):
     
     return Dt
 
+def write_times(Dt,outfolder):
+    filename = outfolder + "/" + "times.h5"
+    f = h5py.File(filename,"w")
+    for key in Dt.keys():
+        f.create_dataset(key,None,None,Dt[key])
+    f.close()
+
+
 def multinode_slave(comm,worker,logger=None):
     work_package = comm.recv(source=0,tag=1)
     dummydata = array(1, dtype='i')
@@ -74,3 +82,5 @@ def multinode_slave(comm,worker,logger=None):
         comm.Send([dummydata,MPI.INT],0,0)
         comm.send(result,dest=0,tag=1)
         work_package = comm.recv(source=0,tag=1)
+
+

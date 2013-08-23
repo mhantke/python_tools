@@ -8,7 +8,7 @@
 import os,re,sys,h5py,pylab,numpy,time,cmath
 
 def get_phase(x):
-    return cmath.phase(x)
+    return numpy.angle(x)
 
 def get_R_and_Theta_map(Nx,Ny,cx=None,cy=None):
     if not cx:
@@ -760,3 +760,109 @@ def get_test_image():
     D=D.reshape((Ny,Nx))
     return D    
 
+# NOT TESTED
+def phase_diff(imgA,imgB):
+    A = imgA.copy()
+    B = imgB.copy()
+    A = A%(2*numpy.pi)
+    B = B%(2*numpy.pi)
+    return A-B
+
+# t = [t0,t1,...] (transferred into python from libspimage)
+def fourier_translation(A,t):
+    fA = numpy.fft.fftn(A)
+    d = len(list(fA.shape))
+    if d == 1:
+        f = [numpy.mgrid[:fA.shape[0]]]
+    if d == 2:
+        f = numpy.mgrid[:fA.shape[0],:fA.shape[1]]
+    if d == 3:
+        f = numpy.mgrid[:fA.shape[0],:fA.shape[1],:fA.shape[2]]
+    tmp = 0
+    for i,ti,fi in zip(range(d),f,t):
+        tmp += 2*numpy.pi*fi*ti/fA.shape[i]
+    fA *= numpy.cos(tmp) - 1.j * numpy.sin(tmp)
+    A_translated = numpy.fft.ifftn(fA)
+    return A_translated
+
+# This functions translates image b so that it's phases 
+# are as close as possible to a.
+# The translation is done in fourier space and both images
+# should be in real space
+# (transferred into python from libspimage)
+def maximize_overlap(imgA,imgB):
+    imgfA = numpy.fft.fftn(imgA)
+    imgfB = numpy.fft.fftn(imgB)
+    d = len(list(imgfA.shape))
+    if d == 1:
+        t = [numpy.mgrid[:imgfA.shape[0]]]
+    if d == 2:
+        t = numpy.mgrid[:imgfA.shape[0],:imgfA.shape[1]]
+    if d == 3:
+        t = numpy.mgrid[:imgfA.shape[0],:imgfA.shape[1],:imgfA.shape[2]]
+    # Check superposition with normal and rotated image
+    cc = [abs(numpy.fft.ifftn(imgfA*imgfB)),abs(numpy.fft.ifftn(imgfA.conj()*imgfB))]
+    Mcc = numpy.array([cc[0].max(),cc[1].max()])
+    i_max = Mcc.argmax()
+    if i_max == 0:
+        B = imgB
+    else:
+        B = numpy.fft.ifftn(imgfB.conj())
+    c = cc[i_max]
+    index_max = c.argmax()
+    translation = []
+    for di in range(d):
+        translation.append(t[di].flatten()[index_max])
+    translation = numpy.array(translation)
+    if i_max == 0:
+        translation *= -1
+    imgB_new = fourier_translation(B,translation)
+    return imgB_new
+
+# Minimize the difference between the phases of a and b by adding a constant phase to a.
+# (transferred into python from libspimage)
+def phase_match(imgA,imgB,weights=1.):
+    return numpy.angle(((numpy.angle(imgB)-numpy.angle(imgA))*weights).sum())
+
+# Calculates the Phase Retrieval Transfer Function of a bunch of images (the images have to be in real space and unshifted)
+# (pixels which have at least in one reconstruction no defined phase (value = zero) lead to a zero value in the prtf)
+# (translated from libspimage)
+
+def prtf(imgs0,shifted=True):
+    N = imgs0.shape[0]
+    if shifted:
+        imgs = numpy.zeros_like(imgs0)
+        for i in range(N):
+            imgs[i,:,:] = numpy.fft.fftshift(imgs0[i,:,:])
+    else:
+        imgs = imgs0.copy()
+
+    # Average reconstructions
+    # superimpose for obtaining the averaged result of the reconstruction
+    imgs1 = numpy.zeros_like(imgs)
+    img0 = imgs[0,:,:].copy()
+    imgs1[0,:,:] = img0
+    for i in range(1,N):
+        img1 = imgs[i,:,:].copy()
+        img1 = maximize_overlap(imgs1[0,:,:],img1)
+        img1 = abs(img1)*numpy.exp(1.j*(numpy.angle(img1)+phase_match(imgs1[0,:,:],img1)))
+        imgs1[i,:,:] = img1[:,:]
+    imgs1_super = imgs1.mean(0)
+    # Make PRTF
+    # go to fourier space
+    fimgs = numpy.zeros_like(imgs)
+    fimgs1 = numpy.zeros_like(imgs)
+    for i in range(N):
+        fimgs[i,:,:] = numpy.fft.fftn(imgs[i,:,:])
+        fimgs1[i,:,:] = numpy.fft.fftn(imgs1[i,:,:])
+    # mask zeros
+    PRTF = numpy.zeros_like(imgs)
+    tmp = abs(fimgs1) != 0 
+    PRTF[tmp] = fimgs1[tmp]/abs(fimgs1[tmp])
+    PRTF = abs(PRTF.mean(0))
+    PRTF[(fimgs == 0).sum(0) != 0] = 0.
+    PRTF = numpy.array(PRTF,dtype="float32")
+    if shifted:
+        imgs1_super = numpy.fft.fftshift(imgs1_super)
+        PRTF = numpy.fft.fftshift(PRTF)
+    return [PRTF,imgs1_super]

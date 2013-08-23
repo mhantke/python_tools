@@ -355,19 +355,20 @@ class Configuration:
     def read_configfile(self,configfile):
         import ConfigParser
         config = ConfigParser.ConfigParser()
-        try:
-            f = open(configfile)
-            config.readfp(f)
-        except IOError:
-            print "ERROR: Can't read configuration-file."
-            
+        f = open(configfile)
+        config.readfp(f)
         self.confDict = {}
         for section in config.sections(): 
             c = self.confDict[section] = dict(config.items(section))
             for key in c.keys(): 
                 c[key] = estimate_type(c[key])
-                if '$' in key:
-                    c[key] = os.path.expandvars(c[key])
+                if isinstance(c[key],str):
+                    if '$' in c[key]:
+                        c[key] = os.path.expandvars(c[key])
+                    if " " in c[key]:
+                        c[key] = c[key].split()
+                        for i in range(len(c[key])):
+                            c[key][i] = estimate_type(c[key][i])
         f.close()
     
     def set_unspecified_to_default(self,defaultDict):
