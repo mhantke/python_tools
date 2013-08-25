@@ -362,8 +362,10 @@ def turnccw(array2d):
     return array2d_turned
 
 def turn180(img,cx=None,cy=None):
-    if cx == None and cy == None:
-        return img.swapaxes(0,1)
+    if cx == None:
+        cx1 = (img.shape[0]-1)/2
+    if cy == None:
+        cy1 = (img.shape[0]-1)/2
     cx1 = round(cx*2)/2.
     cy1 = round(cy*2)/2.
     Nx1 = int(2*min([cx1,img.shape[1]-1-cx1]))+1
@@ -755,7 +757,6 @@ def get_test_image():
     filename = os.path.dirname(os.path.realpath(__file__)) + "/testdata/testmax_gray.png"
     I = Image.open(filename)
     Nx,Ny = I.size
-    print pylab.array(I.getdata()).shape
     D = pylab.array(I.getdata())[:]
     D=D.reshape((Ny,Nx))
     return D    
@@ -768,67 +769,133 @@ def phase_diff(imgA,imgB):
     B = B%(2*numpy.pi)
     return A-B
 
+
+# should be done with stsci.image package in the future
+def pixel_translation(A,t,method="cubic"):
+    from scipy.interpolate import griddata
+    d = len(list(A.shape))
+    g = numpy.indices(A.shape)
+    gt = numpy.indices(A.shape)
+    gt = list(gt)
+    g = list(g)
+    for i in range(d):
+        gt[i] = (gt[i]-t[i]) % (A.shape[i]-1)
+        g[i] = g[i].flatten()
+    gt = tuple(gt)
+    g = tuple(g)
+    return griddata(g,A.flatten(),gt,method=method)
+        
+
 # t = [t0,t1,...] (transferred into python from libspimage)
-def fourier_translation(A,t):
+def fourier_translation(A,t,rotation=False):
     fA = numpy.fft.fftn(A)
     d = len(list(fA.shape))
-    if d == 1:
-        f = [numpy.mgrid[:fA.shape[0]]]
-    if d == 2:
-        f = numpy.mgrid[:fA.shape[0],:fA.shape[1]]
-    if d == 3:
-        f = numpy.mgrid[:fA.shape[0],:fA.shape[1],:fA.shape[2]]
+    f = numpy.indices(fA.shape)
+    for i in range(d):
+        f[i] = f[i]-numpy.ceil(fA.shape[i]/2.)
+        f[i,:] = numpy.fft.fftshift(f[i,:])[:]
     tmp = 0
-    for i,ti,fi in zip(range(d),f,t):
-        tmp += 2*numpy.pi*fi*ti/fA.shape[i]
-    fA *= numpy.cos(tmp) - 1.j * numpy.sin(tmp)
-    A_translated = numpy.fft.ifftn(fA)
+    for i,ti,fi in zip(range(d),t,f):
+        tmp = tmp + 2*numpy.pi*fi[:,:]*ti/fA.shape[i]
+    A_translated = numpy.fft.ifftn(fA*numpy.exp(-1.j*tmp))
     return A_translated
+
+def fourier_translation_test():
+    A = get_test_image()
+    pylab.imsave("testdata/fourier_translation_test_A.png",A,cmap=pylab.cm.gray)
+    B = fourier_translation(A,[45,34])
+    pylab.imsave("testdata/fourier_translation_test_B.png",B,cmap=pylab.cm.gray,vmin=A.min(),vmax=B.max())
+
+def recover_translation(imgA,imgB,enantio=False):
+    imgfA = numpy.fft.fftn(imgA)
+    imgfB = numpy.fft.fftn(imgB)
+    d = len(list(imgfA.shape))
+    f = numpy.indices(imgfA.shape)
+    for i in range(d):
+        f[i] = f[i]-numpy.ceil(imgfA.shape[i]/2.)
+        f[i,:] = numpy.fft.fftshift(f[i,:])[:]
+    if enantio == False:
+        # Check superposition with image
+        imgB_possibly_turned = imgB
+        c = abs(numpy.fft.ifftn(imgfA*imgfB.conj()))
+    else:
+        # Check superposition with normal and rotated image
+        cc = [abs(numpy.fft.ifftn(imgfA*imgfB.conj())),abs(numpy.fft.ifftn(imgfA*imgfB))]
+        #pylab.imsave("testdata/CC0.png",cc[0])
+        #pylab.imsave("testdata/CC1.png",cc[1])
+        Mcc = numpy.array([cc[0].max(),cc[1].max()])
+        i_max = Mcc.argmax()
+        if i_max == 0:
+            imgB_possibly_turned = imgB
+            c = cc[0]
+        else:
+            imgB_possibly_turned = turnccw(turnccw(imgB))
+            c = abs(numpy.fft.ifftn(imgfA*numpy.fft.fftn(imgB_possibly_turned).conj()))
+    index_max = c.argmax()
+    translation = []
+    for i in range(d):
+        translation.append(f[i,:].flatten()[index_max])
+        #pylab.imsave("testdata/t%i.png" % i,f[i,:,:])
+    translation = numpy.array(translation)
+    #pylab.imsave("testdata/match.png",(f[0,:,:]==translation[0])*(f[1,:,:]==translation[1]))
+    #pylab.imsave("testdata/matchc.png",c)
+    #pylab.imsave("testdata/temp.png",B,cmap=pylab.cm.gray)
+    return [translation,imgB_possibly_turned]
 
 # This functions translates image b so that it's phases 
 # are as close as possible to a.
 # The translation is done in fourier space and both images
 # should be in real space
 # (transferred into python from libspimage)
-def maximize_overlap(imgA,imgB):
-    imgfA = numpy.fft.fftn(imgA)
-    imgfB = numpy.fft.fftn(imgB)
-    d = len(list(imgfA.shape))
-    if d == 1:
-        t = [numpy.mgrid[:imgfA.shape[0]]]
-    if d == 2:
-        t = numpy.mgrid[:imgfA.shape[0],:imgfA.shape[1]]
-    if d == 3:
-        t = numpy.mgrid[:imgfA.shape[0],:imgfA.shape[1],:imgfA.shape[2]]
-    # Check superposition with normal and rotated image
-    cc = [abs(numpy.fft.ifftn(imgfA*imgfB)),abs(numpy.fft.ifftn(imgfA.conj()*imgfB))]
-    Mcc = numpy.array([cc[0].max(),cc[1].max()])
-    i_max = Mcc.argmax()
-    if i_max == 0:
-        B = imgB
-    else:
-        B = numpy.fft.ifftn(imgfB.conj())
-    c = cc[i_max]
-    index_max = c.argmax()
-    translation = []
-    for di in range(d):
-        translation.append(t[di].flatten()[index_max])
-    translation = numpy.array(translation)
-    if i_max == 0:
-        translation *= -1
-    imgB_new = fourier_translation(B,translation)
+def maximize_overlap(imgA,imgB,enantio=False):
+    [translation,imgB_possibly_turned] = recover_translation(imgA,imgB,enantio)
+    imgB_new = fourier_translation(imgB_possibly_turned,translation)
     return imgB_new
+
+def maximize_overlap_test():
+    A = get_test_image()
+    A[:A.shape[0]/3,:] = 0
+    A[2*A.shape[0]/3:,:] = 0
+    A[:,:A.shape[1]/3] = 0
+    A[:,2*A.shape[1]/3:] = 0
+    A = A[:,:]
+    t = [-43,-23]
+    B0 = abs(fourier_translation(A,t))
+    for i,B in zip(range(2),[B0,turnccw(turnccw(B0))]):
+        C = maximize_overlap(A,B,True)
+        print "Difference %i: %f" % (i,abs(A-C).sum())
+        pylab.imsave("testdata/maximize_overlap_test_%i_A.png" % i,A,cmap=pylab.cm.gray)
+        pylab.imsave("testdata/maximize_overlap_test_%i_B.png" % i,B,cmap=pylab.cm.gray,vmin=A.min(),vmax=A.max())
+        pylab.imsave("testdata/maximize_overlap_test_%i_AB.png" % i,C,cmap=pylab.cm.gray,vmin=A.min(),vmax=A.max())
+
+
 
 # Minimize the difference between the phases of a and b by adding a constant phase to a.
 # (transferred into python from libspimage)
-def phase_match(imgA,imgB,weights=1.):
+def phase_match(imgA,imgB,weights=1.): # typically weights = abs(imgA)*abs(imgB)
     return numpy.angle(((numpy.angle(imgB)-numpy.angle(imgA))*weights).sum())
+
+
+def center_of_mass(img0):
+    img = abs(img0)
+    img = img/(1.*img.sum())
+    d = len(list(img.shape))
+    cm = numpy.zeros(d)
+    f = numpy.indices(img.shape)
+    for i in range(d):
+        f[i] = f[i]-numpy.ceil(img.shape[i]/2.)
+        f[i,:] = numpy.fft.fftshift(f[i,:])[:]
+        cm[i] = (f[i,:]*img[:]).sum()
+    return cm
 
 # Calculates the Phase Retrieval Transfer Function of a bunch of images (the images have to be in real space and unshifted)
 # (pixels which have at least in one reconstruction no defined phase (value = zero) lead to a zero value in the prtf)
 # (translated from libspimage)
 
-def prtf(imgs0,shifted=True):
+def prtf(imgs0,**kwargs):
+    enantio = kwargs.get("enantio",True)
+    shifted = kwargs.get("shifted",True)
+    center_image = kwargs.get("center_image",False)
     N = imgs0.shape[0]
     if shifted:
         imgs = numpy.zeros_like(imgs0)
@@ -845,7 +912,7 @@ def prtf(imgs0,shifted=True):
     for i in range(1,N):
         img1 = imgs[i,:,:].copy()
         img1 = maximize_overlap(imgs1[0,:,:],img1)
-        img1 = abs(img1)*numpy.exp(1.j*(numpy.angle(img1)+phase_match(imgs1[0,:,:],img1)))
+        img1 = abs(img1)*numpy.exp(1.j*(numpy.angle(img1)+phase_match(imgs1[0,:,:],img1,abs(imgs1[0,:,:])*abs(img1))))
         imgs1[i,:,:] = img1[:,:]
     imgs1_super = imgs1.mean(0)
     # Make PRTF
@@ -862,7 +929,12 @@ def prtf(imgs0,shifted=True):
     PRTF = abs(PRTF.mean(0))
     PRTF[(fimgs == 0).sum(0) != 0] = 0.
     PRTF = numpy.array(PRTF,dtype="float32")
+    if center_image:
+        CM = center_of_mass(imgs1_super)
+        imgs1_super = pixel_translation(imgs1_super,-CM,"linear")
     if shifted:
         imgs1_super = numpy.fft.fftshift(imgs1_super)
+        for i in range(N):
+            imgs1[i,:,:] = numpy.fft.fftshift(imgs1[i,:,:])
         PRTF = numpy.fft.fftshift(PRTF)
-    return [PRTF,imgs1_super]
+    return [PRTF,imgs1_super,imgs1]
