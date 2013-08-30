@@ -77,7 +77,8 @@ class CXIReader:
         nevents = kwargs.get("nevents",0)
         ifirst = kwargs.get("ifirst",0)
         pick_events = kwargs.get("pick_events","in_sequence")
-        
+        event_filters = kwargs.get("event_filters",{})
+
         [self.directories,self.filenames] = self._resolve_location(location)
         self.ifile = 0
         self.ifile_opened = None
@@ -97,9 +98,13 @@ class CXIReader:
             print "ERROR: Not enough events to read. Change your configuration."
             return
         
-        self.is_event_to_process = self._pick_events(pick_events,ifirst,nevents)
+        to_process = []
+        for N in self.Nevents_files: to_process.append(ones(N,dtype="bool"))
+        to_process = self._filter_events(to_process,event_filters)
+        to_process = self._pick_events(to_process,pick_events,ifirst,nevents)
         self.Nevents_process = 0
-        for N in self.is_event_to_process: self.Nevents_process += N.sum()
+        for N in to_process: self.Nevents_process += N.sum()
+        self.is_event_to_process = to_process
         self.ievent_process = -1
 
         self.dsnames = dsnames
@@ -133,32 +138,50 @@ class CXIReader:
         else:
             filenames = [location.split("/")[-1]]
             directories = [location[:-len(filenames[0])]]
-        return [directories,filenames]
+        return [directories,filenames]        
 
-    def _pick_events(self,mode,ifirst,nevents):
+    def _pick_events(self,to_process,mode,ifirst,nevents):
+        temp = ones(self.Nevents_tot,dtype='bool')
+        offset = 0
+        for t in to_process:
+            temp[offset:offset+len(t)] = t[:]        
         if mode == 'in_sequence':
-            temp = ones(self.Nevents_tot,dtype='bool')
             temp[:ifirst] = False
             if nevents != 0:
-                if nevents+ifirst < self.Nevents_tot:
-                    temp[ifirst+nevents:] = False
+                if nevents <= temp.sum():
+                    s = 0
+                    for i in range(ifirst,self.Nevents_tot):
+                        s += temp[i]
+                        if s == nevents:
+                            break
+                    temp[i+1:] = False
         elif mode == 'randomly':
-            temp = zeros(self.Nevents_tot,dtype='bool')
-            r = range(ifirst,self.Nevents_tot)
+            to_pick_from = arange(self.Nevents_tot)
+            to_pick_from = list(to_pick_from[temp])
+            temp = zeros_like(temp)
+            N = len(to_pick_from)
             for i in range(nevents):
-                k = self.Nevents_tot-i
-                if k >= 0:
-                    j = r[randint(k)].pop()
+                if N-i > 0:
+                    j = to_pick_from[randint(N-i)].pop()
                     temp[j] = True
         else:
             print "ERROR: No valid picking mode chosen: %s" % mode
             return
-        L = []
+        to_process_new = []
         i = 0
         for N in self.Nevents_files:
-            L.append(temp[i:i+N])
+            to_process_new.append(temp[i:i+N])
             i += N
-        return L
+        return to_process_new
+
+    def _filter_events(self,to_process,event_filters):
+        for flt_name in event_filters.keys():
+            flt = event_filters[flt_name]
+            for (i,dty,fle) in zip(range(self.Nfiles),self.directories,self.filenames):
+                f = h5py.File(dty+"/"+fle,"r")
+                filter_ds = f[flt["dataset_name"]].value
+                to_process[i] *= (filter_ds >= f["vmin"]) * (filter_ds <= f["vmax"])
+        return to_process
 
     # move to next event that shall be processed
     def _next(self):
