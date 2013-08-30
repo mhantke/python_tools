@@ -181,7 +181,7 @@ class CXIReader:
             for (i,dty,fle) in zip(range(self.Nfiles),self.directories,self.filenames):
                 f = h5py.File(dty+"/"+fle,"r")
                 filter_ds = f[flt["dataset_name"]].value
-                to_process[i] *= (filter_ds >= f["vmin"]) * (filter_ds <= f["vmax"])
+                to_process[i] *= (filter_ds >= flt["vmin"]) * (filter_ds <= flt["vmax"])
         return to_process
 
     # move to next event that shall be processed
