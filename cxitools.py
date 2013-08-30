@@ -72,10 +72,11 @@ class CXIWriter:
 
 class CXIReader:
     # location can be either a file or a directory
-    def __init__(self,location,dsnames={},def_stack_ds="/i",**kwargs):
+    def __init__(self,location,dsnames={},**kwargs):
         self.logger = kwargs.get("logger",None)
         nevents = kwargs.get("nevents",0)
         ifirst = kwargs.get("ifirst",0)
+        def_stack_ds = kwargs.get("def_stack_ds","/i")
         pick_events = kwargs.get("pick_events","in_sequence")
         event_filters = kwargs.get("event_filters",{})
 
