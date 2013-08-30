@@ -128,7 +128,7 @@ class CXIReader:
     def _resolve_location(self,location):
         if os.path.isdir(location):
             print "isdir"
-            fs = filter(lambda x: x[:-4] == ".cxi",os.listdir(location))
+            fs = filter(lambda x: x[-4:] == ".cxi",os.listdir(location))
             directories = []
             filenames = []
             for f in fs:
