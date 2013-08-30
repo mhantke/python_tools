@@ -86,17 +86,16 @@ class CXIReader:
 
         self.def_stack_ds = def_stack_ds
         self.Nevents_files = self.get_Nevents_files()
+        print self.Nevents_files
         self.Nevents_tot = 0
         for N in self.Nevents_files: self.Nevents_tot += N
         self.ievent_file = -1
         self.ievent_tot = -1
 
         if nevents < 0:
-            print "ERROR: Events to read smaller 1. Change your configuration."
-            return
+            sys.exit("ERROR: Events to read smaller 1. Change your configuration.")
         elif nevents+ifirst > self.Nevents_tot:
-            print "ERROR: Not enough events to read. Change your configuration."
-            return
+            sys.exit("ERROR: Not enough events to read. Change your configuration.")
         
         to_process = []
         for N in self.Nevents_files: to_process.append(ones(N,dtype="bool"))
@@ -118,9 +117,9 @@ class CXIReader:
     def get_Nevents_files(self):
         N = []
         for i in range(len(self.filenames)):
-            print self.directories[i]+'/'+self.filenames[i]
             F = h5py.File(self.directories[i]+'/'+self.filenames[i],'r')
             N.append(F[self.def_stack_ds].shape[0])
+            print N
             F.close()
         return N
         
