@@ -209,6 +209,7 @@ class CXIReader:
 
     def _open_file(self):
         if self.ifile_opened != self.ifile:
+            print "open %s" % (self.directories[self.ifile]+'/'+self.filenames[self.ifile])
             try:
                 self.F.close()
             except:
