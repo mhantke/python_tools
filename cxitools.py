@@ -86,7 +86,6 @@ class CXIReader:
 
         self.def_stack_ds = def_stack_ds
         self.Nevents_files = self.get_Nevents_files()
-        print self.Nevents_files
         self.Nevents_tot = 0
         for N in self.Nevents_files: self.Nevents_tot += N
         self.ievent_file = -1
@@ -119,7 +118,6 @@ class CXIReader:
         for i in range(len(self.filenames)):
             F = h5py.File(self.directories[i]+'/'+self.filenames[i],'r')
             N.append(F[self.def_stack_ds].shape[0])
-            print N
             F.close()
         return N
         
@@ -129,6 +127,7 @@ class CXIReader:
 
     def _resolve_location(self,location):
         if os.path.isdir(location):
+            print "isdir"
             fs = filter(lambda x: x[:-4] == ".cxi",os.listdir(location))
             directories = []
             filenames = []
@@ -136,6 +135,7 @@ class CXIReader:
                 directories.append(location+"/")
                 filenames.append(f.split("/")[-1])
         else:
+            print "is not dir"
             filenames = [location.split("/")[-1]]
             directories = [location[:-len(filenames[0])]]
         return [directories,filenames]        
