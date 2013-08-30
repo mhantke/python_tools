@@ -118,6 +118,7 @@ class CXIReader:
     def get_Nevents_files(self):
         N = []
         for i in range(len(self.filenames)):
+            print self.directories[i]+'/'+self.filenames[i]
             F = h5py.File(self.directories[i]+'/'+self.filenames[i],'r')
             N.append(F[self.def_stack_ds].shape[0])
             F.close()
