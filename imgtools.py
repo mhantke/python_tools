@@ -48,6 +48,11 @@ def cone_pixel_average(image,N_theta,cx=None,cy=None):
             values[j,i] = temp.mean()
     return [radii,values]
 
+#def radial_pixel_average(image,cx=None,cy=None):
+#    [radii,values] = cone_pixel_average(image,1,cx,cy)
+#    return [radii,values[0,:]]
+
+
 def cone_pixel_average_new(image,mask,N_theta,cx=None,cy=None,rdownsample=1):
     [R,Theta] = get_R_and_Theta_map(image.shape[1],image.shape[0],cx,cy)
     radii = pylab.arange(0,R.max()+1,1*rdownsample)
@@ -641,6 +646,7 @@ def radial_pixel_average(image,**kargs):
     if 'cy' in kargs: cy = kargs['cy'] 
     else: cy = (image.shape[0]-1)/2.0
     R = get_R_and_Theta_map(image.shape[1],image.shape[0],cx,cy)[0]
+    R = R.round()
     R[pylab.isfinite(image)==False] = -1
     radii = pylab.arange(R.min(),R.max()+1,1)
     if radii[0] == -1:
@@ -649,7 +655,7 @@ def radial_pixel_average(image,**kargs):
     for i in range(0,len(radii)):
         values[i] = image[R==radii[i]].mean()
     if 'rout' in kargs: return pylab.array([radii,values])
-    else:return values
+    else: return values
 
 def recenter(I,cx,cy):
     dx = int(pylab.ceil(cx-(I.shape[1]-1)/2.))
@@ -878,7 +884,7 @@ def phase_match(imgA,imgB,weights=1.): # typically weights = abs(imgA)*abs(imgB)
 
 def center_of_mass(img0):
     img = abs(img0)
-    img = img/(1.*img.sum())
+    img = img/(1.*img.sum()+numpy.finfo("float32").eps)
     d = len(list(img.shape))
     cm = numpy.zeros(d)
     f = numpy.indices(img.shape)
@@ -896,13 +902,21 @@ def prtf(imgs0,**kwargs):
     enantio = kwargs.get("enantio",True)
     shifted = kwargs.get("shifted",True)
     center_image = kwargs.get("center_image",False)
-    N = imgs0.shape[0]
-    if shifted:
-        imgs = numpy.zeros_like(imgs0)
-        for i in range(N):
-            imgs[i,:,:] = numpy.fft.fftshift(imgs0[i,:,:])
-    else:
-        imgs = imgs0.copy()
+    Nx = imgs0.shape[2]
+    Ny = imgs0.shape[1]
+    cx = kwargs.get("cx",(Nx-1)/2.)
+    cy = kwargs.get("cy",(Ny-1)/2.)
+    selection = kwargs.get("selection",numpy.ones(imgs0.shape[0],dtype="bool"))
+    N = selection.sum()
+    imgs = numpy.zeros(shape=(N,imgs0.shape[1],imgs0.shape[2]),dtype=imgs0.dtype)
+    k = 0
+    for i in range(imgs0.shape[0]):
+        if selection[i]:
+            if shifted:
+                imgs[k,:,:] = numpy.fft.fftshift(imgs0[i,:,:])
+            else:
+                imgs[k,:,:] = imgs0[i,:,:]
+            k += 1
 
     # Average reconstructions
     # superimpose for obtaining the averaged result of the reconstruction
@@ -938,3 +952,18 @@ def prtf(imgs0,**kwargs):
             imgs1[i,:,:] = numpy.fft.fftshift(imgs1[i,:,:])
         PRTF = numpy.fft.fftshift(PRTF)
     return [PRTF,imgs1_super,imgs1]
+
+def half_period_resolution(PRTF,pixel_edge_length,detector_distance,wavelength,cx=None,cy=None):
+    # angular average of PRTF
+    [r,PRTFr] = radial_pixel_average(PRTF,cx=cx,cy=cy,rout=True)
+    dx = wavelength/2./(pylab.sin(pylab.arctan(r*pixel_edge_length/detector_distance))+pylab.finfo('float64').eps)
+    success = PRTFr > (1./numpy.e)
+    if success.sum() == len(success):
+        i = -1
+    elif success.sum() > 0:
+        i = (numpy.arange(len(success))[success==False])[0]-1
+    else:
+        i = 0
+    return [dx[i],PRTFr]
+
+    

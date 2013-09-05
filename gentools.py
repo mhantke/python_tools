@@ -383,7 +383,8 @@ class Configuration:
                     if self.verbose:
                         print "Add variable %s with default value %s to configuration section %s as variable did not exist." % (variableName,str(defaultDict[section][variableName]),section)
     
-                    
+              
+      
 def mkdir_timestamped(dirname):
     ts = time.time()
     time_string = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d_%H%M%S')

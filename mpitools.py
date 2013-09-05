@@ -6,7 +6,7 @@
 # Email: maxhantke@gmail.com
 
 from pylab import *
-import time
+import time,h5py
 from mpi4py import MPI
 
 def multinode_master(comm,Njobs,getwork,logres=None,logger=None):

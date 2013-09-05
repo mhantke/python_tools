@@ -128,7 +128,6 @@ class CXIReader:
 
     def _resolve_location(self,location):
         if os.path.isdir(location):
-            print "isdir"
             fs = filter(lambda x: x[-4:] == ".cxi",os.listdir(location))
             directories = []
             filenames = []
@@ -136,7 +135,6 @@ class CXIReader:
                 directories.append(location+"/")
                 filenames.append(f.split("/")[-1])
         else:
-            print "is not dir"
             filenames = [location.split("/")[-1]]
             directories = [location[:-len(filenames[0])]]
         return [directories,filenames]        
@@ -199,10 +197,11 @@ class CXIReader:
                 if self.logger != None:
                     self.logger.info("Reached end of file (%i) %s/%s.",self.ifile,self.directories[self.ifile],self.filenames[self.ifile])
                 self.ifile += 1
-                self.ievent_file = 0
+                self.ievent_file = -1
             if self.is_event_to_process[self.ifile][self.ievent_file] == False:
-                if self.logger != None:
-                    self.logger.info("Skip event %i in file %i.",self.ievent_file,self.ifile)
+                pass
+                #if self.logger != None:
+                #    self.logger.info("Skip event %i in file %i.",self.ievent_file,self.ifile)
             else:
                 self.ievent_process += 1
                 break
@@ -210,7 +209,6 @@ class CXIReader:
 
     def _open_file(self):
         if self.ifile_opened != self.ifile:
-            print "open %s" % (self.directories[self.ifile]+'/'+self.filenames[self.ifile])
             try:
                 self.F.close()
             except:
@@ -220,10 +218,9 @@ class CXIReader:
         
     def _get(self,dsnames):
         self._open_file()
-        i = self.ievent_process
         D = {}
-        D["i"] = i
+        D["i"] = self.ievent_process
         for (key,dsname) in dsnames.items():
-            D[key] = self.F[dsname][i]
+            D[key] = self.F[dsname][self.ievent_file]
         return D
 
