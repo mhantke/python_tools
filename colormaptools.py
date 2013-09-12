@@ -52,4 +52,4 @@ cdict_jet_lightbg = {'red':   [(0.0,1.0,1.0),
                                (0.625,0.0,0.0),
                                (1.0,0.0,0.0)]}
 
-cmaps = {"jet_lightbg":matplotlib.colors.LinearSegmentedColormap('jet_lightbg', cdict_jet, 1024)}
+cmaps = {"jet_lightbg":matplotlib.colors.LinearSegmentedColormap('jet_lightbg', cdict_jet_lightbg, 1024)}
