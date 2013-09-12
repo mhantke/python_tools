@@ -21,27 +21,28 @@ def get_filenames(in_filter=None,path="./"):
 
 def estimate_type(var):
     #first test bools
-    if var == 'True':
-            return True
-    elif var == 'False':
-            return False
+    if var.lower() == 'true':
+        return True
+    elif var.lower() == 'false':
+        return False
+    elif var.lower() == 'none':
+        return None
     else:
-            #int
-            try:
-                    return int(var)
-            except ValueError:
-                    pass
-            #float
-            try:
-                    return float(var)
-            except ValueError:
-                    pass
-            #string
-            try:
-                    return str(var)
-            except ValueError:
-                    raise NameError('Something Messed Up Autocasting var %s (%s)' 
-                                      % (var, type(var)))
+        #int
+        try:
+            return int(var)
+        except ValueError:
+            pass
+        #float
+        try:
+            return float(var)
+        except ValueError:
+            pass
+        #string
+        try:
+            return str(var)
+        except ValueError:
+            raise NameError('Something messed up autocasting var %s (%s)' % (var, type(var)))
 
 def png_mask_to_h5(filename,Nx,Ny):
     import Image,spimage

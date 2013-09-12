@@ -89,6 +89,11 @@ class CXIReader:
         self.Nevents_files = self.get_Nevents_files()
         self.Nevents_tot = 0
         for N in self.Nevents_files: self.Nevents_tot += N
+
+        if self.logger != None:
+            for d,f,N in zip(self.directories,self.filenames,self.Nevents_files):
+                self.logger.info("Found file %s/%s with %i events.",d,f,N)
+
         self.ievent_file = -1
         self.ievent_tot = -1
 
@@ -129,6 +134,7 @@ class CXIReader:
     def _resolve_location(self,location):
         if os.path.isdir(location):
             fs = filter(lambda x: x[-4:] == ".cxi",os.listdir(location))
+            fs.sort()
             directories = []
             filenames = []
             for f in fs:
@@ -144,13 +150,15 @@ class CXIReader:
         offset = 0
         for t in to_process:
             temp[offset:offset+len(t)] = t[:]        
+            offset += len(t)
         if mode == 'in_sequence':
             temp[:ifirst] = False
             if nevents != 0:
                 if nevents <= temp.sum():
                     s = 0
                     for i in range(ifirst,self.Nevents_tot):
-                        s += temp[i]
+                        if temp[i]:
+                            s += 1
                         if s == nevents:
                             break
                     temp[i+1:] = False
@@ -174,12 +182,18 @@ class CXIReader:
         return to_process_new
 
     def _filter_events(self,to_process,event_filters):
-        for flt_name in event_filters.keys():
-            flt = event_filters[flt_name]
-            for (i,dty,fle) in zip(range(self.Nfiles),self.directories,self.filenames):
-                f = h5py.File(dty+"/"+fle,"r")
-                filter_ds = f[flt["dataset_name"]].value
-                to_process[i] *= (filter_ds >= flt["vmin"]) * (filter_ds <= flt["vmax"])
+        for (i,dty,fle) in zip(range(self.Nfiles),self.directories,self.filenames):
+            if self.logger != None:
+                self.logger.info("Filtering %s/%s",dty,fle)
+            f = h5py.File(dty+"/"+fle,"r")
+            for flt_name in event_filters.keys():
+                flt = event_filters[flt_name]
+                filter_ds = f[flt["dataset_name"]].value.flatten()
+                F = (filter_ds >= flt["vmin"]) * (filter_ds <= flt["vmax"])
+                to_process[i] *= F
+                if self.logger != None:
+                    self.logger.info("Filter %s - yield %.3f %% -> total yield %.3f %%",flt_name,100.*F.sum()/len(F),100.*to_process[i].sum()/len(F))
+                    self.logger.info("Filter %s - First index: %i",flt_name,(arange(len(to_process[i]))[to_process[i]])[0])
         return to_process
 
     # move to next event that shall be processed
@@ -209,10 +223,12 @@ class CXIReader:
 
     def _open_file(self):
         if self.ifile_opened != self.ifile:
-            try:
+            if self.ifile_opened != None:
+                if self.logger != None:
+                    self.logger.info("Closing file: %s/%s",self.directories[self.ifile_opened],self.filenames[self.ifile_opened])            
                 self.F.close()
-            except:
-                pass
+            if self.logger != None:
+                self.logger.info("Opening file: %s/%s",self.directories[self.ifile],self.filenames[self.ifile])
             self.F = h5py.File(self.directories[self.ifile]+'/'+self.filenames[self.ifile],'r')
             self.ifile_opened = self.ifile
         
@@ -221,6 +237,6 @@ class CXIReader:
         D = {}
         D["i"] = self.ievent_process
         for (key,dsname) in dsnames.items():
-            D[key] = self.F[dsname][self.ievent_file]
+            D[key] = self.F[dsname][self.ievent_file].copy()
         return D
 

@@ -474,13 +474,23 @@ def pad_zeros(arr_orig,factor,shifted=False):
     Nx_d = Nx_new-Nx
     Ny_d = Ny_new-Ny
     arr_out = pylab.zeros(shape=(Ny_new,Nx_new),dtype=arr.dtype)
-    if shifted:
+    if not shifted:
         arr = pylab.fftshift(arr)
     arr_out[Ny_d/2:Ny_d/2+Ny,Nx_d/2:Nx_d/2+Nx] = arr[:,:]
-    if shifted:
+    if not shifted:
         arr_out = pylab.fftshift(arr_out)
     return arr_out
-    
+
+def fourier_upsample(arr_orig,factor,shifted=False):
+    if not shifted:
+        arr = arr_orig.copy()
+    else:
+        arr = numpy.fft.fftshift(arr_orig)
+    farr = numpy.fft.fftn(arr)
+    pfarr = pad_zeros(farr,factor)
+    ups_arr = numpy.fft.ifftn(pfarr)
+    return ups_arr
+
 def depixelate(arr_orig,factor,shifted=False):
     arr = arr_orig.copy()
     farr = pylab.fft2(arr)
@@ -777,7 +787,7 @@ def phase_diff(imgA,imgB):
 
 
 # should be done with stsci.image package in the future
-def pixel_translation(A,t,method="cubic"):
+def pixel_translation(A,t,method="linear"):
     from scipy.interpolate import griddata
     d = len(list(A.shape))
     g = numpy.indices(A.shape)
@@ -790,7 +800,22 @@ def pixel_translation(A,t,method="cubic"):
     gt = tuple(gt)
     g = tuple(g)
     return griddata(g,A.flatten(),gt,method=method)
-        
+
+# should be done with stsci.image package in the future
+def upsample(A,f,method="linear"):
+    from scipy.interpolate import griddata
+    d = len(list(A.shape))
+    g = numpy.indices(A.shape)
+    new_shape = tuple((numpy.array(A.shape)*f).round())
+    gt = numpy.indices(new_shape)
+    gt = list(gt)
+    g = list(g)
+    for i in range(d):
+        gt[i] = (gt[i].flatten()/(1.*f)) % (A.shape[i]-1.)
+        g[i] = g[i].flatten()
+    gt = tuple(gt)
+    g = tuple(g)
+    return griddata(g,A.flatten(),gt,method=method).reshape(new_shape)
 
 # t = [t0,t1,...] (transferred into python from libspimage)
 def fourier_translation(A,t,rotation=False):
@@ -873,8 +898,6 @@ def maximize_overlap_test():
         pylab.imsave("testdata/maximize_overlap_test_%i_A.png" % i,A,cmap=pylab.cm.gray)
         pylab.imsave("testdata/maximize_overlap_test_%i_B.png" % i,B,cmap=pylab.cm.gray,vmin=A.min(),vmax=A.max())
         pylab.imsave("testdata/maximize_overlap_test_%i_AB.png" % i,C,cmap=pylab.cm.gray,vmin=A.min(),vmax=A.max())
-
-
 
 # Minimize the difference between the phases of a and b by adding a constant phase to a.
 # (transferred into python from libspimage)
@@ -964,6 +987,6 @@ def half_period_resolution(PRTF,pixel_edge_length,detector_distance,wavelength,c
         i = (numpy.arange(len(success))[success==False])[0]-1
     else:
         i = 0
-    return [dx[i],PRTFr]
+    return [dx[i],PRTFr,1./dx]
 
     
