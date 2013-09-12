@@ -53,3 +53,11 @@ cdict_jet_lightbg = {'red':   [(0.0,1.0,1.0),
                                (1.0,0.0,0.0)]}
 
 cmaps = {"jet_lightbg":matplotlib.colors.LinearSegmentedColormap('jet_lightbg', cdict_jet_lightbg, 1024)}
+
+def make_colorbar(filename,Nx,Ny,colormap=cm.jet,orientation="vertical"):
+    X,Y = meshgrid(arange(Nx),arange(Ny))
+    if orientation == "vertical":
+        C = -Y
+    else:
+        C = X
+    imsave(filename,C,cmap=colormap)
