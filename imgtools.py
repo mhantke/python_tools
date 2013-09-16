@@ -286,8 +286,10 @@ def crop(pattern,cropLength,center='middle',bg=0):
     else:
         if center == "center_of_mass":
             [y_center,x_center] = center_of_mass(pattern)
+            x_center = numpy.ceil(pattern.shape[0]/2.) + x_center
+            y_center = numpy.ceil(pattern.shape[0]/2.) + y_center
         else:
-            x_center = center[1]
+            x_center = numpy.ceil(pattern.shape[1] - 1) center[1]
             y_center = center[0]
         temp = recenter(pattern,x_center,y_center)
 
