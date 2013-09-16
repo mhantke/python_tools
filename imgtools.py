@@ -53,6 +53,18 @@ def cone_pixel_average(image,N_theta,cx=None,cy=None):
 #    return [radii,values[0,:]]
 
 
+def center_of_mass(img0):
+    img = abs(img0)
+    img = img/(1.*img.sum()+numpy.finfo("float32").eps)
+    d = len(list(img.shape))
+    cm = numpy.zeros(d)
+    f = numpy.indices(img.shape)
+    for i in range(d):
+        f[i] = f[i]-numpy.ceil(img.shape[i]/2.)
+        f[i,:] = numpy.fft.fftshift(f[i,:])[:]
+        cm[i] = (f[i,:]*img[:]).sum()
+    return cm
+
 def cone_pixel_average_new(image,mask,N_theta,cx=None,cy=None,rdownsample=1):
     [R,Theta] = get_R_and_Theta_map(image.shape[1],image.shape[0],cx,cy)
     radii = pylab.arange(0,R.max()+1,1*rdownsample)
@@ -266,32 +278,14 @@ def downsample_spi(img,factor,mode="pick",ds_msk=True):
         img_new.mask[:,:] = 1
     return img_new
 
-
-
-def center_of_mass(pattern,masking_threshold=None):
-    if masking_threshold:
-        mask = pylab.ones(shape=pattern.shape)
-        mask[pattern<=masking_threshold] = -1
-        mask[pattern>masking_threshold] = 0
-        mask += 1
-    else:
-        mask = abs(pattern)
-    #pylab.figure()
-    #pylab.imshow(mask)
-    #pylab.show()
-    X,Y = pylab.meshgrid(pylab.arange(0,pattern.shape[1],1),pylab.arange(0,pattern.shape[0],1))
-    x_center = (X*mask).sum()/mask.sum()
-    y_center = (Y*mask).sum()/mask.sum()
-    return [y_center,x_center]
-
-def crop(pattern,cropLength,center='middle',bg=0,masking_threshold=None):
+def crop(pattern,cropLength,center='middle',bg=0):
     if center == 'middle':
         x_center = (pattern.shape[1] - 1)/2.
         y_center = (pattern.shape[0] - 1)/2.
         temp = pattern.copy()
     else:
         if center == "center_of_mass":
-            [y_center,x_center] = center_of_mass(pattern,masking_threshold)
+            [y_center,x_center] = center_of_mass(pattern)
         else:
             x_center = center[1]
             y_center = center[0]
@@ -850,8 +844,10 @@ def recover_translation(imgA,imgB,enantio=False):
         imgB_possibly_turned = imgB
         c = abs(numpy.fft.ifftn(imgfA*imgfB.conj()))
     else:
+        imgB_turned = turnccw(turnccw(imgB))
+        imgfB_turned = numpy.fft.fftn(imgB_turned)
         # Check superposition with normal and rotated image
-        cc = [abs(numpy.fft.ifftn(imgfA*imgfB.conj())),abs(numpy.fft.ifftn(imgfA*imgfB))]
+        cc = [abs(numpy.fft.ifftn(imgfA*imgfB.conj())),abs(numpy.fft.ifftn(imgfA*imgfB_turned.conj()))]
         #pylab.imsave("testdata/CC0.png",cc[0])
         #pylab.imsave("testdata/CC1.png",cc[1])
         Mcc = numpy.array([cc[0].max(),cc[1].max()])
@@ -860,8 +856,8 @@ def recover_translation(imgA,imgB,enantio=False):
             imgB_possibly_turned = imgB
             c = cc[0]
         else:
-            imgB_possibly_turned = turnccw(turnccw(imgB))
-            c = abs(numpy.fft.ifftn(imgfA*numpy.fft.fftn(imgB_possibly_turned).conj()))
+            imgB_possibly_turned = imgB_turned
+            c = cc[1]
     index_max = c.argmax()
     translation = []
     for i in range(d):
@@ -899,23 +895,59 @@ def maximize_overlap_test():
         pylab.imsave("testdata/maximize_overlap_test_%i_B.png" % i,B,cmap=pylab.cm.gray,vmin=A.min(),vmax=A.max())
         pylab.imsave("testdata/maximize_overlap_test_%i_AB.png" % i,C,cmap=pylab.cm.gray,vmin=A.min(),vmax=A.max())
 
-# Minimize the difference between the phases of a and b by adding a constant phase to a.
-# (transferred into python from libspimage)
-def phase_match(imgA,imgB,weights=1.): # typically weights = abs(imgA)*abs(imgB)
-    return numpy.angle(((numpy.angle(imgB)-numpy.angle(imgA))*weights).sum())
+# under construction
+# maximize phase match in fourier space
+def maximize_phase_match(imgA,imgB,enantio=False):
+    from scipy.optimize import leastsq
+    imgfA = numpy.fft.fftn(imgA)
+    imgfB = numpy.fft.fftn(imgB)
+    pimgfA = numpy.angle(imgfA)
+    pimgfB = numpy.angle(imgfB)
 
+    pdiff = pimgfA-pimgfB
 
-def center_of_mass(img0):
-    img = abs(img0)
-    img = img/(1.*img.sum()+numpy.finfo("float32").eps)
-    d = len(list(img.shape))
-    cm = numpy.zeros(d)
-    f = numpy.indices(img.shape)
+    d = len(list(imgfA.shape))
+    f = numpy.indices(imgfA.shape)
     for i in range(d):
-        f[i] = f[i]-numpy.ceil(img.shape[i]/2.)
+        f[i] = f[i]-numpy.ceil(imgfA.shape[i]/2.)
         f[i,:] = numpy.fft.fftshift(f[i,:])[:]
-        cm[i] = (f[i,:]*img[:]).sum()
-    return cm
+
+    if d == 1:
+        p = lambda v: v[0] + v[1]*f
+    elif d ==2:
+        p = lambda v: v[0] + v[1]*f[0,:,:] + v[2]*f[1,:,:]
+    elif d ==3:
+        p = lambda v: v[0] + v[1]*f[0,:,:] + v[2]*f[1,:,:] + v[3]*f[2,:,:]
+    v0 = numpy.array([0.]*(d+1))
+    err = lambda v: ((p(v)-pdiff)**2).sum()
+    v1, success = leastsq(lambda v: ones(len(v))*err(v),v0)
+    
+    if enantio:
+        imgfB_e = imgfB.conj()
+        pimgfB_e = numpy.angle(pimgfB)
+        err_e = lambda v: (abs(p(v)-pdiff_e)).sum()
+        v1_e, success_e = leastsq(lambda v: ones(len(v))*err_e(v),v0)
+        
+        if err_e(v1_e) < err(v1):
+            v1 = v1_res
+            pimgfB_res = -pimgfB
+
+    fres = abs(imgB)*numpy.exp(1.j*(pimgfB+p(v1)))
+    res = numpy.fft.ifftn(fres)
+    return [ref,fres]
+
+# Minimize the difference between the phases of a and b by adding a constant phase to b.
+# (transferred into python from libspimage)
+def phase_match(imgA,imgB,weights=None): # typically weights = (abs(imgA)*abs(imgB))
+    diff = numpy.angle(imgA)-numpy.angle(imgB)
+    if weights == None:
+        w = 1/(1.*len(diff.flatten()))
+    else:
+        w = weights / weights.sum()
+    return (diff*w).sum()
+
+
+
 
 # Calculates the Phase Retrieval Transfer Function of a bunch of images (the images have to be in real space and unshifted)
 # (pixels which have at least in one reconstruction no defined phase (value = zero) lead to a zero value in the prtf)
@@ -948,8 +980,9 @@ def prtf(imgs0,**kwargs):
     imgs1[0,:,:] = img0
     for i in range(1,N):
         img1 = imgs[i,:,:].copy()
-        img1 = maximize_overlap(imgs1[0,:,:],img1)
-        img1 = abs(img1)*numpy.exp(1.j*(numpy.angle(img1)+phase_match(imgs1[0,:,:],img1,abs(imgs1[0,:,:])*abs(img1))))
+        img1 = maximize_overlap(img0,img1,enantio)
+        weights = abs(img0)*abs(img1)
+        img1 = abs(img1)*numpy.exp(1.j*(numpy.angle(img1)+phase_match(img0,img1,weights)))
         imgs1[i,:,:] = img1[:,:]
     imgs1_super = imgs1.mean(0)
     # Make PRTF

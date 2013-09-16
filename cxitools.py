@@ -240,3 +240,18 @@ class CXIReader:
             D[key] = self.F[dsname][self.ievent_file].copy()
         return D
 
+def cxi_to_spimage(filename,i,ds_img="/entry_1/image_2/data",ds_msk="/entry_1/image_2/mask"):
+    import spimage
+    f = h5py.File(filename,"r")
+    img_cxi = f[ds_img][i,:,:]
+    img_cxi[img_cxi<0] = 0
+    msk_cxi = f[ds_msk][i,:,:]
+    Nx = msk_cxi.shape[1]
+    Ny = msk_cxi.shape[0]
+    img = spimage.sp_image_alloc(Nx,Ny,1)
+    img.image[:,:] = img_cxi[:,:]
+    img.mask[:,:] = (msk_cxi[:,:] & PIXEL_IS_IN_MASK) == 0
+    filename_new = filename[:-4] + ("_%i.h5" % i)
+    spimage.sp_image_write(img,filename_new,0)
+    spimage.sp_image_free(img)
+    f.close()
