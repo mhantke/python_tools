@@ -390,11 +390,13 @@ def mkdir_timestamped(dirname):
     ts = time.time()
     time_string = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d_%H%M%S')
     real_dir = dirname+'_'+time_string
-    if real_dir.split("/")[-1] != "":
-        link = real_dir.split("/")[-1]
-    else:
-        link = real_dir.split("/")[-2]
     os.system('mkdir %s' % real_dir)
-    os.system('rm -f %s' % dirname)
-    os.system('ln -s %s %s' % (link,dirname))
     return real_dir
+
+def make_link(linkname,targetname):
+    if linkname[-1] == "/":
+        ln = linkname[:-1]
+    else:
+        ln = linkname
+    os.system('rm -f %s' % linkname)
+    os.system('ln -s %s %s' % (targetname,linkname))

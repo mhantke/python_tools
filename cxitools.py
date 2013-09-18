@@ -37,7 +37,7 @@ class CXIWriter:
                     self.f.create_group(name)
                 self.write(d[k],name)
             else:
-                self.write_to_dataset(name,d[k],d["i"])
+                self.write_to_dataset(name,d[k],d.get("i",-1))
     def write_to_dataset(self,name,data,i):
         if name not in self.f:
             if isscalar(data):
@@ -239,6 +239,14 @@ class CXIReader:
         for (key,dsname) in dsnames.items():
             D[key] = self.F[dsname][self.ievent_file].copy()
         return D
+
+def get_filters(C):
+    filters = filter(lambda x: "filter" in x,C.keys())
+    Cfilters = {}
+    for f in filters:
+        Cfilters[f] = C[f]
+    return Cfilters
+
 
 def cxi_to_spimage(filename,i,ds_img="/entry_1/image_2/data",ds_msk="/entry_1/image_2/mask"):
     import spimage
