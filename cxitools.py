@@ -98,7 +98,7 @@ class CXIReader:
         self.ievent_tot = -1
 
         if nevents < 0:
-            sys.exit("ERROR: Events to read smaller 1. Change your configuration.")
+            sys.exit("ERROR: Events to read smaller 0. Change your configuration.")
         elif nevents+ifirst > self.Nevents_tot:
             sys.exit("ERROR: Not enough events to read. Change your configuration.")
         
@@ -154,7 +154,7 @@ class CXIReader:
         if mode == 'in_sequence':
             temp[:ifirst] = False
             if nevents != 0:
-                if nevents <= temp.sum():
+                if nevents < temp.sum():
                     s = 0
                     for i in range(ifirst,self.Nevents_tot):
                         if temp[i]:
@@ -162,15 +162,17 @@ class CXIReader:
                         if s == nevents:
                             break
                     temp[i+1:] = False
-        elif mode == 'randomly':
+        elif mode == 'random':
             to_pick_from = arange(self.Nevents_tot)
             to_pick_from = list(to_pick_from[temp])
             temp = zeros_like(temp)
-            N = len(to_pick_from)
             for i in range(nevents):
-                if N-i > 0:
-                    j = to_pick_from[randint(N-i)].pop()
+                N = len(to_pick_from)
+                if N != 1:
+                    j = to_pick_from.pop(randint(N))
                     temp[j] = True
+                else:
+                    temp[to_pick_from[0]] = True
         else:
             print "ERROR: No valid picking mode chosen: %s" % mode
             return
