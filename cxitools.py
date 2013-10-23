@@ -39,6 +39,8 @@ class CXIWriter:
             else:
                 self.write_to_dataset(name,d[k],d.get("i",-1))
     def write_to_dataset(self,name,data,i):
+        #if self.logger != None:
+        #    self.logger.info("Write dataset %s of event %i." % (name,i))
         if name not in self.f:
             if isscalar(data):
                 if i == -1:
@@ -202,6 +204,10 @@ class CXIReader:
     def _next(self):
         # skip events that shall not be processed
         while True:
+            if self.ievent_process == self.Nevents_process-1:
+                if self.logger != None:
+                    self.logger.info("Reached last event to process.")
+                return False
             self.ievent_file += 1
             # return none if end of file list is reached
             if self.ifile >= self.Nfiles:

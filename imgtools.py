@@ -104,36 +104,33 @@ def radial_pixel_sum(image,cx=None,cy=None):
     return pylab.array([radii,values])
 
 
-def cartesian_to_polar(cartesian_pattern,N_theta,x_center=None,y_center=None,R=None):
-    Nx = cartesian_pattern.shape[1]
-    Ny = cartesian_pattern.shape[0]
-    if R == None:
-        R = int(min([Nx,Ny])/2.0-1)
-    polar_pattern = pylab.zeros(shape=(R,N_theta))
-    if x_center == None:
-        x_center = Nx/2.0-0.5
-    if y_center == None:
-        y_center = Ny/2.0-0.5
-    for i_theta in range(0,N_theta):
-        for r in range(0,R):
-            theta = 2*pylab.pi*i_theta/float(N_theta)
-            x = x_center + r * pylab.sin(theta)
-            y = y_center + r * pylab.cos(theta)
-            # bilinear interpolation
-            x1 = int(pylab.floor(x))
-            x2 = x1+1
-            y1 = int(pylab.floor(y))
-            y2 = y1+1
-            if x1 < Nx and x2 < Nx and y1 < Ny and y2 < Ny and  x1 >= 0 and x2 >= 0 and y1 >= 0 and y2 >= 0:
-                    V11 = cartesian_pattern[int(pylab.floor(y)),int(pylab.floor(x))]
-                    V12 = cartesian_pattern[int(pylab.floor(y)),int(pylab.floor(x))+1]
-                    V21 = cartesian_pattern[int(pylab.floor(y))+1,int(pylab.floor(x))]
-                    V22 = cartesian_pattern[int(pylab.floor(y))+1,int(pylab.floor(x))+1]
-                    polar_pattern[r,i_theta] = V11*(x2-x)*(y2-y) + V12*(x-x1)*(y2-y) + V21*(x2-x)*(y-y1) + V22*(x-x1)*(y-y1)
-            else:
-                polar_pattern[r,i_theta] = pylab.infty
-            
-    return polar_pattern
+def cartesian_to_polar(data,N_theta=100,cx0=None,cy0=None,r_max0=None,order=0):
+    import scipy.ndimage
+
+    if cx0 == None:
+        cx = (data.shape[1]-1)/2.
+    else:
+        cx = cx0
+    if cy0 == None:
+        cy = (data.shape[0]-1)/2.
+    else:
+        cy = cy0
+
+    if r_max0 == None:
+        r_max = data.shape[0]/2
+    else:
+        r_max = r_max0
+
+    def cartesian2polar(outcoords):
+        ri,thetai = outcoords
+        theta = thetai/(1.*(N_theta-1))*2*pylab.pi
+        X = cx+ri*pylab.cos(theta)
+        Y = cy+ri*pylab.sin(theta)
+        return (Y,X)
+
+    data_polar = scipy.ndimage.geometric_transform(data, cartesian2polar,order=order,output_shape=(r_max,N_theta))
+    return data_polar
+
 
 def cartesian_to_radial(cartesian,N_theta):
     return pylab.mean(cartesian_to_polar(cartesian,N_theta),1)
@@ -690,39 +687,72 @@ def recenter(I,cx,cy):
 def downsample_position(position,downsampling):
     return (position-(downsampling-1)/2.)/(1.*downsampling)
 
-def angular_correlation(I,M,cx,cy,N_theta,rdownsample=1,outfolder='',filename=''):
-    [Ipolar,Mpolar] = cone_pixel_average_new(I,M,N_theta,cx,cy,rdownsample)
-    pylab.imsave('%s/%s_rimg.png' % (outfolder,filename[:-3]),(Ipolar)*pylab.log10(10*Mpolar))
-    Cpolar = pylab.zeros(shape=(N_theta,Mpolar.shape[1]))
-    Npolar = pylab.zeros(shape=(N_theta,Mpolar.shape[1]))
-    for r in range(Mpolar.shape[1]):
-        for t in range(Mpolar.shape[0]):
-            V1 = Ipolar[t,r]
-            if Mpolar[t,r] == 1:
-                for dt in range(Mpolar.shape[0]):
-                    if Mpolar[(t+dt)%N_theta,r] == 1:
-                        V2 = Ipolar[(t+dt)%N_theta,r]
-                        Cpolar[dt,r] += V1*V2
-                        Npolar[dt,r] += 1
-    Cpolar /= 1.*Npolar
-    return Cpolar
+def pair_correlation(I,M0=None):
+    if M0 == None:
+        M = numpy.ones(shape=I.shape,dtype="bool")
+    else:
+        M = M0
 
-def test_angular_correlation():
+    Nx = I.shape[1]
+    Ny = I.shape[0]
+
+    CI = numpy.zeros_like(I)
+    CN = numpy.zeros_like(M)
+    Im = numpy.zeros_like(I)
+    
+    for dy in range(Ny):
+        if M[dy,:].sum() > 1:
+            Iy = I[dy,:][M[dy,:]]
+            Im[dy,:] = (I[dy,:]-Iy.mean())/(Iy.std()+pylab.finfo('float64').eps)
+    for dx in range(Nx):
+        for ix in range(Nx):
+            m = M[:,ix]*M[:,(ix+dx)%Nx]
+            CN[:,dx] += m[:]
+            CI[:,dx] += Im[:,ix]*Im[:,(ix+dx)%Nx]*m[:]
+    
+    CM = CN != 0
+    return [CI,CM]
+
+def test_pair_correlation():
+    if True:
+        Nx = 101
+        Ny = 111
+        X,Y = numpy.meshgrid(numpy.arange(Nx),numpy.arange(Ny))
+        img = numpy.sin(2*numpy.pi/(10.)*X)
+        msk = numpy.ones(shape=img.shape,dtype="bool")
+        CI,CM = pair_correlation(img,msk)
+    pylab.clf()
+    outfolder = "./testdata/"
+    pylab.plot(CI.sum(0))
+    pylab.savefig('%s/test_Cpolar.png' % outfolder)
+    pylab.imsave('%s/C.png' % outfolder,CI*numpy.log10(10*CM))
+    pylab.imsave('%s/img.png' % outfolder,img)
+    pylab.imsave('%s/msk.png' % outfolder,msk)
+
+def radial_pair_correlation(I,M0=None,N_theta=None,cx=None,cy=None):
+    Ip = cartesian_to_polar(I,N_theta,cx,cy)
+    if M0 != None:
+        Mp = cartesian_to_polar(M0,N_theta,cx,cy) == 1
+    else:
+        Mp = None
+    return pair_correlation(Ip,Mp)
+
+def test_radial_pair_correlation():
+    name = "pair_correlation"
     if False:
-        N = 100
-        c = 49.5
-        X,Y = pylab.meshgrid(pylab.arange(N),pylab.arange(N))
-        X -= c
-        Y -= c
-        R = pylab.sqrt(X**2+Y**2)
-        img = pylab.zeros_like(R)
-        img[abs(X)<4.] = 1.
-        img[abs(Y)<4.] = 1.
-        msk = pylab.ones_like(img)
-        C = angular_correlation(img,msk,c,c,101)
-    if False:
+        Nx = 120
+        Ny = 100
+        cx = 40
+        cy = 50
+        R,Theta = get_R_and_Theta_map(Nx,Ny,cx,cy)
+        img = R*numpy.sin(Theta*10.)
+        msk = numpy.ones(shape=img.shape,dtype="bool")
+        msk[30:50,:] = False
+        CI,CM = radial_pair_correlation(img,msk,100,cx,cy)
+    if True:
         import propagator as p
         I = p.Input()
+        ds = 2
         I.detector.init_mask(Nx=1024,
                              Ny=1024,
                              y_gap_size_in_pixel=23,
@@ -734,32 +764,18 @@ def test_angular_correlation():
         O = p.propagator(I)
         img = pylab.poisson(O.get_intensity_pattern())
         msk = I.detector.mask
-        C = angular_correlation(img,msk,I.detector.cx,I.detector.cy,31)
-        rmin = (pylab.arange(C.shape[1])[pylab.isfinite(C.sum(0))])[0]
-        rmax = (pylab.arange(C.shape[1])[pylab.isfinite(C.sum(0))])[-1]
-        C = C[:,rmin:rmax+1]
-    if True:
-        import spimage as s
-        fn = '/disk2/LCLS201207_extension/alphas128/r0121/LCLS_2012_Jul22_r0121_220004_45bf_preprocessed.h5'
-        I = s.sp_image_read(fn,0)
-        img = I.image.real.copy()
-        msk = I.mask.copy()
-        #print I.detector.image_center[0],I.detector.image_center[1]
-        #print img[msk==1]
-        per = pylab.percentile(img[msk==1],80.)
-        #print per
-        img = pylab.array(img>per,dtype='float')
-        C = angular_correlation(img,msk,I.detector.image_center[0],I.detector.image_center[1],31)
-        rmin = (pylab.arange(C.shape[1])[pylab.isfinite(C.sum(0))])[0]
-        rmax = (pylab.arange(C.shape[1])[pylab.isfinite(C.sum(0))])[-1]
-        C = C[:,rmin:rmax+1]
-    #print C
-    pylab.clf()
-    pylab.plot(C.sum(1))
-    pylab.savefig('test_Cpolar.png')
-    pylab.imsave('C.png',C)
-    pylab.imsave('img.png',img)
-    pylab.imsave('msk.png',msk)
+        cx =  I.detector.cx
+        cy = I.detector.cy
+        CI,CM = radial_pair_correlation(img,msk,cx,cy)
+    Ip = cartesian_to_polar(img,100,cx,cy)
+    pylab.imsave("testdata/%s_img.png" % name,img*numpy.log10(msk*10))
+    pylab.imsave("testdata/%s_Ip.png" % name,Ip)
+    pylab.imsave("testdata/%s_PC.png" % name,CI*numpy.log10(CM*10))
+    pylab.imsave("testdata/%s_limg.png" % name,numpy.log10(img)*numpy.log10(msk*10))
+    pylab.imsave("testdata/%s_lIp.png" % name,numpy.log10(Ip))
+    pylab.imsave("testdata/%s_lPC.png" % name,numpy.log10(CI)*numpy.log10(CM*10))
+
+    
 
 downsample_position = lambda x,N,binsize: (x-(binsize-1)/2.)*(N/(1.*binsize)-1)/(1.*(N-binsize))
 upsample_position = lambda x,N,binsize: x*(N*binsize-binsize)/(1.*(N-1))+(binsize-1)/2.
