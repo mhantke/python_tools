@@ -193,7 +193,19 @@ class CXIReader:
             for flt_name in event_filters.keys():
                 flt = event_filters[flt_name]
                 filter_ds = f[flt["dataset_name"]].value.flatten()
-                F = (filter_ds >= flt["vmin"]) * (filter_ds <= flt["vmax"])
+                if "vmin" in flt.keys() and "vmax" in flt.keys():
+                    F = (filter_ds >= flt["vmin"]) * (filter_ds <= flt["vmax"])
+                elif "indices" in flt.keys():
+                    if i != 0:
+                        if self.logger != None:
+                            self.logger.warning("Filter indices are applied to every file!")
+                    F = zeros_like(to_process[i])
+                    for index in flt["indices"]:
+                        F[filter_ds == index] = True
+                else:
+                    if self.logger != None:
+                        self.logger.warning("No valid filter arguments given for filter %s!" % flt_name)
+                    F = ones_like(to_process[i])
                 to_process[i] *= F
                 if self.logger != None:
                     self.logger.info("Filter %s - yield %.3f %% -> total yield %.3f %%",flt_name,100.*F.sum()/len(F),100.*to_process[i].sum()/len(F))
