@@ -6,6 +6,10 @@
 # Email: maxhantke@gmail.com
 
 import os,re,sys,h5py,pylab,numpy,time,cmath
+import cxitools
+
+this_folder = os.path.dirname(__file__)
+
 
 def get_phase(x):
     return numpy.angle(x)
@@ -142,22 +146,20 @@ def draw_circle(Nx,Ny,diameter):
     circle[circle!=0] = 1
     return circle
 
-def gaussian_smooth(I,sm):
-    N = 2*sm
+def gaussian_smooth(I,sm,precision=2):
+    N = numpy.ceil(precision*sm)
     if len(I.shape) == 2:
         import scipy.signal
-        kernel = pylab.zeros(shape=(1+2*sm,1+2*sm))
         X,Y = pylab.meshgrid(pylab.arange(0,N,1),pylab.arange(0,N,1))
-        X -= (N-1)/2.
-        Y -= (N-1)/2.
+        X = X-(N-1)/2.
+        Y = Y-(N-1)/2.
         R = pylab.sqrt(X**2 + Y**2)
         kernel = pylab.exp(R**2/(1.0*sm**2))
         Ism = scipy.signal.convolve2d(I,pylab.fftshift(kernel),mode='same',boundary='fill')
         return Ism
     elif len(I.shape) == 1:
-        kernel = pylab.zeros(1+2*sm)
         X = pylab.arange(0,N,1)
-        X -= (N-1)/2.
+        X = X-(N-1)/2.
         kernel = pylab.exp(X**2/(1.0*sm**2))
         Ism = pylab.convolve(I,pylab.fftshift(kernel),mode='same')
         return Ism
@@ -168,9 +170,7 @@ def gaussian_smooth_2d1d(I,sm):
         import scipy.signal
         kernel = pylab.zeros(shape=(1+2*sm,1+2*sm))
         X,Y = pylab.meshgrid(pylab.arange(0,N,1),pylab.arange(0,N,1))
-        X -= (N-1)/2.
-        #Y -= (N-1)/2.
-        #R = pylab.sqrt(X**2 + Y**2)
+        X = X-(N-1)/2.
         kernel = pylab.exp(X**2/(1.0*sm**2))
         Ism = scipy.signal.convolve2d(I,kernel,mode='same',boundary='wrap')
         return Ism
@@ -643,10 +643,17 @@ def put_besides(img1,img2):
     img3[:img2.shape[0]:,img1.shape[1]:] = img2[:,:]
     return img3
 
-def radial_pixel_average(image,**kargs):
-    if 'cx' in kargs: cx = kargs['cx']
+def _radial(image,mode="mean",**kwargs):
+    if mode == "mean": f = numpy.mean
+    elif mode == "sum": f = numpy.sum
+    elif mode == "std": f = numpy.std
+    elif mode == "median": f = numpy.median
+    else:
+        print "ERROR: No valid mode given for radial projection."
+        return
+    if 'cx' in kwargs: cx = kwargs['cx']
     else: cx = (image.shape[1]-1)/2.0
-    if 'cy' in kargs: cy = kargs['cy'] 
+    if 'cy' in kwargs: cy = kwargs['cy'] 
     else: cy = (image.shape[0]-1)/2.0
     R = get_R_and_Theta_map(image.shape[1],image.shape[0],cx,cy)[0]
     R = R.round()
@@ -656,33 +663,80 @@ def radial_pixel_average(image,**kargs):
         radii = radii[1:]
     values = pylab.zeros_like(radii)
     for i in range(0,len(radii)):
-        values[i] = image[R==radii[i]].mean()
-    if 'rout' in kargs: return pylab.array([radii,values])
+        values[i] = f(image[R==radii[i]])
+    if 'rout' in kwargs: return pylab.array([radii,values])
     else: return values
+def radial_sum(image,**kwargs):
+    return _radial(image,"sum",**kwargs)
+def radial_std(image,**kwargs):
+    return _radial(image,"std",**kwargs)
+def radial_mean(image,**kwargs):
+    return _radial(image,"mean",**kwargs)
+def radial_median(image,**kwargs):
+    return _radial(image,"median",**kwargs)
 
-def recenter(I,cx,cy):
+def _radial_fast(image,mode="mean",**kwargs):
+    if mode != "mean" and mode != "sum":
+        print "ERROR: No valid mode given for radial projection."
+        return
+    if 'cx' in kwargs: cx = int(round(kwargs['cx']))
+    else: cx = (image.shape[1]-1)/2
+    if 'cy' in kwargs: cy = int(round(kwargs['cy']))
+    else: cy = (image.shape[0]-1)/2
+    X, Y = numpy.indices(image.shape) 
+    R = numpy.sqrt((X-cx)**2+(Y-cy)**2)
+    ind = numpy.argsort(R.flat)
+    # radii-sorted data
+    sRi = R.flat[ind].astype(numpy.int16)   
+    simage = numpy.float64(image.flat[ind])
+    # array that is 1 for all indices where radius changes in relation to previous index
+    dR = (sRi[1:] - sRi[:-1]) != 0
+    csimage = numpy.cumsum(simage)
+    rsimage = numpy.ones(dR.sum()+1,dtype="float")
+    rsimage[0] = csimage[0]
+    rsimage[1:] = (csimage[1:])[dR] - (csimage[:-1])[dR]
+    if mode == "sum":
+        return rsimage
+    elif mode == "mean":
+        csones = numpy.cumsum(numpy.ones(len(csimage),dtype="float"))
+        rN = numpy.zeros(dR.sum()+1,dtype="float")
+        rN[0] = 0.
+        rN[1:] = (csones[1:])[dR] - (csones[:-1])[dR]
+        return rsimage/csones
+
+def radial_sum_fast(image,**kwargs):
+    return _radial_fast(image,"sum",**kwargs)
+def radial_mean_fast(image,**kwargs):
+    return _radial_fast(image,"mean",**kwargs)
+
+#def recenter(I,cx,cy):
+#    dx = int(pylab.ceil(cx-(I.shape[1]-1)/2.))
+#    dy = int(pylab.ceil(cy-(I.shape[0]-1)/2.))
+#    I_recentered = pylab.zeros_like(I)
+#    if   dx > 0 and dy > 0:
+#        I_recentered[:-dy,:-dx] = I[dy:,dx:]
+#    elif dx > 0 and dy < 0:
+#        I_recentered[-dy:,:-dx] = I[:dy,dx:]
+#    elif dx < 0 and dy > 0:
+#        I_recentered[:-dy,-dx:] = I[dy:,:dx]
+#    elif dx < 0 and dy < 0:
+#        I_recentered[-dy:,-dx:] = I[:dy,:dx]
+#    elif dx == 0 and dy < 0:
+#        I_recentered[-dy:,:] = I[:dy,:]
+#    elif dx == 0 and dy > 0:
+#        I_recentered[:-dy,:] = I[dy:,:]
+#    elif dx > 0 and dy == 0:
+#        I_recentered[:,:-dx] = I[:,dx:]
+#    elif dx < 0 and dy == 0:
+#        I_recentered[:,-dx:] = I[:,:dx]
+#    elif dx == 0 and dy == 0:
+#        I_recentered[:,:] = I[:,:]
+#    return I_recentered
+
+def recenter(I,cx,cy,interpolation="linear"):
     dx = int(pylab.ceil(cx-(I.shape[1]-1)/2.))
     dy = int(pylab.ceil(cy-(I.shape[0]-1)/2.))
-    I_recentered = pylab.zeros_like(I)
-    if   dx > 0 and dy > 0:
-        I_recentered[:-dy,:-dx] = I[dy:,dx:]
-    elif dx > 0 and dy < 0:
-        I_recentered[-dy:,:-dx] = I[:dy,dx:]
-    elif dx < 0 and dy > 0:
-        I_recentered[:-dy,-dx:] = I[dy:,:dx]
-    elif dx < 0 and dy < 0:
-        I_recentered[-dy:,-dx:] = I[:dy,:dx]
-    elif dx == 0 and dy < 0:
-        I_recentered[-dy:,:] = I[:dy,:]
-    elif dx == 0 and dy > 0:
-        I_recentered[:-dy,:] = I[dy:,:]
-    elif dx > 0 and dy == 0:
-        I_recentered[:,:-dx] = I[:,dx:]
-    elif dx < 0 and dy == 0:
-        I_recentered[:,-dx:] = I[:,:dx]
-    elif dx == 0 and dy == 0:
-        I_recentered[:,:] = I[:,:]
-    return I_recentered
+    return pixel_translation(I,[dy,dx],interpolation)
 
 def downsample_position(position,downsampling):
     return (position-(downsampling-1)/2.)/(1.*downsampling)
@@ -807,7 +861,7 @@ def pixel_translation(A,t,method="linear"):
     gt = list(gt)
     g = list(g)
     for i in range(d):
-        gt[i] = (gt[i]-t[i]) % (A.shape[i]-1)
+        gt[i] = ((gt[i]+t[i]) % A.shape[i])
         g[i] = g[i].flatten()
     gt = tuple(gt)
     g = tuple(g)
@@ -841,6 +895,7 @@ def fourier_translation(A,t,rotation=False):
     for i,ti,fi in zip(range(d),t,f):
         tmp = tmp + 2*numpy.pi*fi[:,:]*ti/fA.shape[i]
     A_translated = numpy.fft.ifftn(fA*numpy.exp(-1.j*tmp))
+    #print "%e" % (abs(A).sum()/abs(A_translated).sum())
     return A_translated
 
 def fourier_translation_test():
@@ -859,8 +914,9 @@ def recover_translation(imgA,imgB,enantio=False):
         f[i,:] = numpy.fft.fftshift(f[i,:])[:]
     if enantio == False:
         # Check superposition with image
-        imgB_possibly_turned = imgB
+        imgB_new = imgB
         c = abs(numpy.fft.ifftn(imgfA*imgfB.conj()))
+        turned = False
     else:
         imgB_turned = turnccw(turnccw(imgB))
         imgfB_turned = numpy.fft.fftn(imgB_turned)
@@ -871,10 +927,12 @@ def recover_translation(imgA,imgB,enantio=False):
         Mcc = numpy.array([cc[0].max(),cc[1].max()])
         i_max = Mcc.argmax()
         if i_max == 0:
-            imgB_possibly_turned = imgB
+            #imgB_new = imgB
+            turned = False
             c = cc[0]
         else:
-            imgB_possibly_turned = imgB_turned
+            #imgB_new = imgB_turned
+            turned = True
             c = cc[1]
     index_max = c.argmax()
     translation = []
@@ -885,17 +943,20 @@ def recover_translation(imgA,imgB,enantio=False):
     #pylab.imsave("testdata/match.png",(f[0,:,:]==translation[0])*(f[1,:,:]==translation[1]))
     #pylab.imsave("testdata/matchc.png",c)
     #pylab.imsave("testdata/temp.png",B,cmap=pylab.cm.gray)
-    return [translation,imgB_possibly_turned]
+    return [translation,turned]
 
 # This functions translates image b so that it's phases 
 # are as close as possible to a.
 # The translation is done in fourier space and both images
 # should be in real space
 # (transferred into python from libspimage)
-def maximize_overlap(imgA,imgB,enantio=False):
-    [translation,imgB_possibly_turned] = recover_translation(imgA,imgB,enantio)
-    imgB_new = fourier_translation(imgB_possibly_turned,translation)
-    return imgB_new
+def maximize_overlap(imgA0,imgB0,enantio=False):
+    imgA = imgA0.copy()
+    imgB = imgB0.copy()
+    [translation,turned] = recover_translation(imgA,imgB,enantio)
+    if turned: imgB = turnccw(turnccw(imgB))
+    imgB = fourier_translation(imgB,translation)
+    return [imgB,translation,turned]
 
 def maximize_overlap_test():
     A = get_test_image()
@@ -954,27 +1015,85 @@ def maximize_phase_match(imgA,imgB,enantio=False):
     res = numpy.fft.ifftn(fres)
     return [ref,fres]
 
+# in fourier space subtract phase ramp obtained by leastsq, corresponding to translation in real space
+# input: real space
+# output: real space and fourier space data
+def minimize_phase_ramp(img,shifted=False,periodic_boundary=False):
+    from scipy.optimize import leastsq,fmin_cobyla
+    
+    imgf = numpy.fft.fftn(numpy.fft.fftshift(img))
+    pimgf = numpy.angle(imgf)+numpy.pi
+
+    d = len(list(imgf.shape))
+    f = numpy.indices(imgf.shape)
+    for i in range(d):
+        f[i] = f[i]-numpy.ceil(imgf.shape[i]/2.)
+        f[i,:] = numpy.fft.fftshift(f[i,:])[:]
+    if d == 1:
+        p = lambda v: (v[0] + v[1]*f) % (2*numpy.pi)
+        v00 = pimgf[f[0]==0][0]
+        v01 = pimgf[f[0]==1][0]-v00
+        v0 = [v00,v01]
+    elif d ==2:
+        p = lambda v: (v[0] + v[1]*f[0,:,:] + v[2]*f[1,:,:])  % (2*numpy.pi)
+        v00 = pimgf[(f[0]==0)*(f[1]==0)][0]
+        v01 = pimgf[(f[0]==1)*(f[1]==0)][0]-v00
+        v02 = pimgf[(f[0]==0)*(f[1]==1)][0]-v00
+        v0 = [v00,v01,v02]
+    elif d ==3:
+        p = lambda v: v[0] + (v[1]*f[0,:,:] + v[2]*f[1,:,:] + v[3]*f[2,:,:])  % (2*numpy.pi)
+        v00 = pimgf[(f[0]==0)*(f[1]==0)*(f[2]==0)][0]
+        v01 = pimgf[(f[0]==1)*(f[1]==0)*(f[2]==0)][0]-v00
+        v02 = pimgf[(f[0]==0)*(f[1]==1)*(f[2]==0)][0]-v00
+        v03 = pimgf[(f[0]==0)*(f[1]==0)*(f[2]==1)][0]-v00
+        v0 = [v00,v01,v02,v03]
+    err = lambda v: ((pimgf-p(v))**2).sum()
+    v1, success = leastsq(lambda v: numpy.ones(len(v))*err(v),v0)
+
+    v2 = v1.copy()
+    if periodic_boundary:
+        for i in range(d):
+            m1 = v1[i+1]*imgf.shape[i]/(2.*numpy.pi)
+            m2 = round(v1[i+1]*imgf.shape[i]/(2.*numpy.pi))
+            v2[i+1] = m2/m1*v1[i+1]
+
+    resf = abs(imgf)*numpy.exp(1.j*(pimgf-p(v2)))
+    res = numpy.fft.ifftn(resf)
+
+    if shifted:
+        resf = numpy.fft.fftshift(resf)
+        res = numpy.fft.fftshift(res)
+
+
+    translation = v2[1:]/(2*numpy.pi)*numpy.array(pimgf.shape)
+    #pylab.imsave(this_folder+"/testdata/subtract_phase_ramp_pimgf.png",pimgf)
+    #pylab.imsave(this_folder+"/testdata/subtract_phase_ramp_pv1.png",p(v1))
+    #pylab.imsave(this_folder+"/testdata/subtract_phase_ramp_pv2.png",p(v2))
+
+    return [res,translation]
+
+
+
 # Minimize the difference between the phases of a and b by adding a constant phase to b.
 # (transferred into python from libspimage)
 def phase_match(imgA,imgB,weights=None): # typically weights = (abs(imgA)*abs(imgB))
     diff = numpy.angle(imgA)-numpy.angle(imgB)
     if weights == None:
-        w = 1/(1.*len(diff.flatten()))
+        w = 1/(1.*len(diff.flatten()) + pylab.finfo('float64').eps)
     else:
-        w = weights / weights.sum()
+        w = weights / (weights.sum() + pylab.finfo('float64').eps)
     return (diff*w).sum()
 
 
-
-
-# Calculates the Phase Retrieval Transfer Function of a bunch of images (the images have to be in real space and unshifted)
-# (pixels which have at least in one reconstruction no defined phase (value = zero) lead to a zero value in the prtf)
-# (translated from libspimage)
-
-def prtf(imgs0,**kwargs):
-    enantio = kwargs.get("enantio",True)
+def prtf(imgs0,msks0,**kwargs):
+    enantio = kwargs.get("enantio",False)
     shifted = kwargs.get("shifted",True)
-    center_image = kwargs.get("center_image",False)
+    do_center_image = kwargs.get("center_image",False)
+    pixels_to_exclude = kwargs.get("pixels_to_exclude",None)
+    do_maximize_overlap = kwargs.get("maximize_overlap",True)
+    do_minimize_phase_ramp = kwargs.get("minimize_phase_ramp",False)
+    do_phase_match = kwargs.get("real_space_phase_match",True)
+    do_align_com_support = kwargs.get("align_com_support",True)
     Nx = imgs0.shape[2]
     Ny = imgs0.shape[1]
     cx = kwargs.get("cx",(Nx-1)/2.)
@@ -982,27 +1101,69 @@ def prtf(imgs0,**kwargs):
     selection = kwargs.get("selection",numpy.ones(imgs0.shape[0],dtype="bool"))
     N = selection.sum()
     imgs = numpy.zeros(shape=(N,imgs0.shape[1],imgs0.shape[2]),dtype=imgs0.dtype)
+    msks = numpy.zeros(shape=(N,msks0.shape[1],msks0.shape[2]),dtype="float")
     k = 0
     for i in range(imgs0.shape[0]):
         if selection[i]:
             if shifted:
                 imgs[k,:,:] = numpy.fft.fftshift(imgs0[i,:,:])
+                msks[k,:,:] = numpy.fft.fftshift(msks0[i,:,:])
             else:
                 imgs[k,:,:] = imgs0[i,:,:]
+                msks[k,:,:] = msks0[i,:,:]
             k += 1
-
     # Average reconstructions
     # superimpose for obtaining the averaged result of the reconstruction
-    imgs1 = numpy.zeros_like(imgs)
-    img0 = imgs[0,:,:].copy()
-    imgs1[0,:,:] = img0
-    for i in range(1,N):
+    imgs1 = numpy.zeros(shape=(N,Ny,Nx),dtype=imgs0.dtype)
+    msks1 = numpy.zeros(shape=(N,Ny,Nx),dtype="float")
+    for i in range(0,N):
         img1 = imgs[i,:,:].copy()
-        img1 = maximize_overlap(img0,img1,enantio)
-        weights = abs(img0)*abs(img1)
-        img1 = abs(img1)*numpy.exp(1.j*(numpy.angle(img1)+phase_match(img0,img1,weights)))
+        msk1 = msks[i,:,:].copy()
+        img0 = imgs1[0,:,:].copy()
+        msk0 = msks1[0,:,:].copy()
+
+        if do_center_image and i==0:
+            CM = center_of_mass(abs(img1)*msk1)
+            img1 = pixel_translation(img1,CM,"nearest")
+            msk1 = pixel_translation(msk1,CM,"nearest")
+
+        if do_minimize_phase_ramp:
+            [img1,translation] = minimize_phase_ramp(img1,shifted=False,periodic_boundary=True)
+            msk1 = numpy.int16(abs(fourier_translation(msk1,translation)).round())
+            if enantio:
+                img1_turned = turnccw(turnccw(img1))
+                msk1_turned = turnccw(turnccw(msk1))
+                if ((img1.shape[0] % 2) == 0) or ((img1.shape[1] % 2) == 0):
+                    tx = int((img1.shape[1] % 2) == 0) * -1
+                    ty = int((img1.shape[0] % 2) == 0) * -1
+                    img1_turned = pixel_translation(img1_turned,[ty,tx],"nearest")
+                    msk1_turned = pixel_translation(msk1_turned,[ty,tx],"nearest")
+                diff_not_turned = (abs(msk0)-abs(msk1))**2
+                diff_turned = (abs(msk0)-abs(msk1_turned))**2
+
+                #pylab.imsave(this_folder+"/testdata/prtf_diff_not_turned_%i.png" % i,numpy.fft.fftshift(diff_not_turned))
+                #pylab.imsave(this_folder+"/testdata/prtf_diff_turned_%i.png" % i,numpy.fft.fftshift(diff_turned))
+                #pylab.imsave(this_folder+"/testdata/prtf_img0_%i.png" % i,numpy.fft.fftshift(abs(img0)))
+                #pylab.imsave(this_folder+"/testdata/prtf_img1_%i.png" % i,numpy.fft.fftshift(abs(img1)))
+                #pylab.imsave(this_folder+"/testdata/prtf_img1_turned_%i.png" % i,numpy.fft.fftshift(abs(img1_turned)))
+
+                if abs(diff_turned).sum() < abs(diff_not_turned).sum():
+                    img1 = img1_turned
+                    msk1 = msk1_turned
+        
+        if do_maximize_overlap and i!=0:
+            [img1,translation,turned] = maximize_overlap(img0,img1,enantio)
+            if turned: msk1 = numpy.fft.fftshift(turnccw(turnccw(numpy.fft.fftshift(msk1))))
+            msk1 = abs(fourier_translation(msk1,translation))
+
+        if do_phase_match and i!=0:
+            weights = abs(img0)*abs(img1)
+            img1 = abs(img1)*numpy.exp(1.j*(numpy.angle(img1)+phase_match(img0,img1,weights)))
+
         imgs1[i,:,:] = img1[:,:]
+        msks1[i,:,:] = msk1[:,:]
     imgs1_super = imgs1.mean(0)
+    msks1_super = msks1.mean(0)
     # Make PRTF
     # go to fourier space
     fimgs = numpy.zeros_like(imgs)
@@ -1012,24 +1173,37 @@ def prtf(imgs0,**kwargs):
         fimgs1[i,:,:] = numpy.fft.fftn(imgs1[i,:,:])
     # mask zeros
     PRTF = numpy.zeros_like(imgs)
-    tmp = abs(fimgs1) != 0 
+    tmp = abs(fimgs1) != 0.
+    if pixels_to_exclude != None:
+        tmp *=  pixels_to_exclude
     PRTF[tmp] = fimgs1[tmp]/abs(fimgs1[tmp])
     PRTF = abs(PRTF.mean(0))
     PRTF[(fimgs == 0).sum(0) != 0] = 0.
     PRTF = numpy.array(PRTF,dtype="float32")
-    if center_image:
-        CM = center_of_mass(imgs1_super)
-        imgs1_super = pixel_translation(imgs1_super,-CM,"linear")
+
+    if do_align_com_support:
+        com = center_of_mass((msk1==1))
+        if com[0] > 0:
+            imgs1_super = turnccw(turnccw(imgs1_super))
+            msks1_super = turnccw(turnccw(msks1_super))
+
+    if do_center_image:
+        CM = center_of_mass(abs(imgs1_super)*msks1_super)
+        imgs1_super = pixel_translation(imgs1_super,CM,"nearest")
+        msks1_super = pixel_translation(msks1_super,CM,"nearest")
+
     if shifted:
         imgs1_super = numpy.fft.fftshift(imgs1_super)
+        msks1_super = numpy.fft.fftshift(msks1_super)
         for i in range(N):
             imgs1[i,:,:] = numpy.fft.fftshift(imgs1[i,:,:])
+            msks1[i,:,:] = numpy.fft.fftshift(msks1[i,:,:])
         PRTF = numpy.fft.fftshift(PRTF)
-    return [PRTF,imgs1_super,imgs1]
+    return [PRTF,imgs1_super,msks1_super,imgs1,msks1,fimgs1]
 
 def half_period_resolution(PRTF,pixel_edge_length,detector_distance,wavelength,cx=None,cy=None):
     # angular average of PRTF
-    [r,PRTFr] = radial_pixel_average(PRTF,cx=cx,cy=cy,rout=True)
+    [r,PRTFr] = radial_mean(PRTF,cx=cx,cy=cy,rout=True)
     dx = wavelength/2./(pylab.sin(pylab.arctan(r*pixel_edge_length/detector_distance))+pylab.finfo('float64').eps)
     success = PRTFr > (1./numpy.e)
     if success.sum() == len(success):
@@ -1040,4 +1214,104 @@ def half_period_resolution(PRTF,pixel_edge_length,detector_distance,wavelength,c
         i = 0
     return [dx[i],PRTFr,1./dx]
 
+# under testing
+def half_pixel_downsampling(img0,msk0,downsampling=2,mode="conservative",cx=None,cy=None,cropLength=None):
+    Nx = int(numpy.ceil(img0.shape[1]/(1.*downsampling)))*downsampling
+    Ny = int(numpy.ceil(img0.shape[0]/(1.*downsampling)))*downsampling
+    img = numpy.zeros(shape=(Ny,Nx),dtype="float")
+    msk = numpy.zeros(shape=(Ny,Nx),dtype="int16")
+    img[:img0.shape[0],:img0.shape[1]] = img0[:,:]
+    msk[:msk0.shape[0],:msk0.shape[1]] = msk0[:,:]
+    X,Y = numpy.meshgrid(numpy.arange(Nx),numpy.arange(Ny))
+    Nx_XxX = Nx/downsampling + ((Nx%downsampling)!=0)
+    Ny_XxX = Ny/downsampling + ((Ny%downsampling)!=0)
+    X_XxX,Y_XxX = numpy.meshgrid(numpy.arange(Nx_XxX),numpy.arange(Ny_XxX))
+
+    I_XxX = numpy.zeros(shape=(Ny,Nx),dtype="int")
+    M = numpy.zeros(shape=(Ny,Nx),dtype="int")
+    k = 0
+    for iy_XxX in numpy.arange(Ny_XxX):
+        for ix_XxX in numpy.arange(Nx_XxX):
+            x0 = ix_XxX*downsampling
+            y0 = iy_XxX*downsampling
+            k += 1
+            popbox = range(downsampling*downsampling)
+            for i in numpy.arange(downsampling*downsampling):
+                j = popbox.pop(numpy.random.randint(len(popbox)))
+                x = j%downsampling
+                y = j/downsampling
+                if y0+y<Ny and x0+x<Nx:
+                    M[y0+y,x0+x] = i
+                    I_XxX[y0+y,x0+x] = k
+                    
+
+    ind0 = M<downsampling*downsampling/2
+    ind1 = M>=downsampling*downsampling/2
+    sind0 = I_XxX[ind0].argsort()#[::-1]
+    sind1 = I_XxX[ind1].argsort()#[::-1]
     
+    B0_img = numpy.reshape((img[ind0])[sind0],(Nx_XxX*Ny_XxX,downsampling*downsampling/2))
+    B1_img = numpy.reshape((img[ind1])[sind1],(Nx_XxX*Ny_XxX,downsampling*downsampling/2))
+
+    B0_msk = numpy.reshape((msk[ind0])[sind0],(Nx_XxX*Ny_XxX,downsampling*downsampling/2))
+    B1_msk = numpy.reshape((msk[ind1])[sind1],(Nx_XxX*Ny_XxX,downsampling*downsampling/2))
+
+    mskXxX0 = numpy.zeros(shape=(Ny_XxX,Nx_XxX),dtype="int16").flat
+    mskXxX1 = numpy.zeros(shape=(Ny_XxX,Nx_XxX),dtype="int16").flat
+    mskgoodXxX0 = numpy.zeros(shape=(Ny_XxX,Nx_XxX),dtype="int16").flat
+    mskgoodXxX1 = numpy.zeros(shape=(Ny_XxX,Nx_XxX),dtype="int16").flat
+    imgXxX0 = numpy.zeros(shape=(Ny_XxX,Nx_XxX),dtype="float").flat
+    imgXxX1 = numpy.zeros(shape=(Ny_XxX,Nx_XxX),dtype="float").flat
+    N0 = numpy.zeros(shape=(Ny_XxX,Nx_XxX),dtype="float").flat
+    N1 = numpy.zeros(shape=(Ny_XxX,Nx_XxX),dtype="float").flat
+    for i in range(downsampling*downsampling/2):
+        m0 = B0_msk[:,i]
+        m1 = B1_msk[:,i]
+        n0 = ((m0 & cxitools.PIXEL_IS_IN_MASK) == 0)
+        n1 = ((m1 & cxitools.PIXEL_IS_IN_MASK) == 0)
+        i0 = B0_img[:,i]
+        i1 = B1_img[:,i]
+        mskXxX0 |= m0
+        mskXxX1 |= m1
+        mskgoodXxX0 |= n0*m0
+        mskgoodXxX1 |= n1*m1
+        imgXxX0 += n0*i0
+        imgXxX1 += n1*i1
+        N0 += n0
+        N1 += n1
+    if mode == "conservative":
+        M = (N0+N1)==downsampling*downsampling
+        imgXxX0[M==False] = 0
+        imgXxX1[M==False] = 0
+        imgXxX0[M] *= 2
+        imgXxX1[M] *= 2
+    elif mode == "non-conservative":
+        M = (N0!=0)*(N1!=0)
+        imgXxX0[M==False] = 0
+        imgXxX1[M==False] = 0
+        imgXxX0[M] *= downsampling*downsampling/N0[M]
+        imgXxX1[M] *= downsampling*downsampling/N1[M]
+        mskXxX0[M] = mskgoodXxX0[M]
+        mskXxX1[M] = mskgoodXxX1[M]
+    else:
+        print "Invalid mode."
+        return
+        
+    imgXxX0 = numpy.reshape(imgXxX0,(Ny_XxX,Nx_XxX))
+    imgXxX1 = numpy.reshape(imgXxX1,(Ny_XxX,Nx_XxX))
+    mskXxX0 = numpy.reshape(mskXxX0,(Ny_XxX,Nx_XxX))
+    mskXxX1 = numpy.reshape(mskXxX1,(Ny_XxX,Nx_XxX))
+
+    if cropLength != None:
+        if cx == None or cy == None:
+            center = "middle"
+        else:
+            center = [cy,cx]
+        imgXxX0 = crop(imgXxX0,cropLength,center)
+        imgXxX1 = crop(imgXxX1,cropLength,center)
+        mskXxX0 = crop(mskXxX0,cropLength,center)
+        mskXxX1 = crop(mskXxX1,cropLength,center)
+        
+    return [imgXxX0,mskXxX0,imgXxX1,mskXxX1]
+
+

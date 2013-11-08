@@ -6,7 +6,7 @@
 # Email: maxhantke@gmail.com
 
 from pylab import *
-import time,h5py
+import time,h5py,sys
 from mpi4py import MPI
 
 def multinode_master(comm,Njobs,getwork,logres=None,logger=None):
@@ -29,16 +29,34 @@ def multinode_master(comm,Njobs,getwork,logres=None,logger=None):
     while Njobs_done < Njobs:
         t0 = time.time()
         request = comm.Irecv(dummybuffer,MPI.ANY_SOURCE,0)
+        if logger != None:
+            logger.debug("Waiting for job to finish.")
+            w0 = time.time()
         MPI.Request.Wait(request, status)
+        if logger != None:
+            w1 = time.time()
+            logger.debug("Job finished (waiting time: %.1f sec).",w1-w0)
         i_done = status.source
         texec[i_done,1] = t1 = time.time()
         Njobs_done += 1
         if logger != None:
             logger.info("Datarate %.1f Hz job %i/%i rank %i/%i",Njobs_done/(time.time()-t_start),Njobs_done,Njobs,i_done,comm_size)
+        if logger != None:
+            logger.debug("Waiting for result to be transferred.")
+            r0 = time.time()
         result = comm.recv(source=i_done,tag=1)
+        if logger != None:
+            r1 = time.time()
+            logger.debug("Result transferred (time: %.1f)",r1-r0)
         t2 = time.time()
         if logres != None:
+            if logger != None:
+                logger.debug("Waiting for result to be saved.")
+                s0 = time.time()
             logres(result)
+            if logger != None:
+                s1 = time.time()
+                logger.debug("Result saved (time: %.1f).",s1-s0)
         t3 = time.time()
         Dt["work"].append((texec[i_done,1]-texec[i_done,0])/(1.*(comm_size-1)))
         if Njobs_started < Njobs:
@@ -59,6 +77,7 @@ def multinode_master(comm,Njobs,getwork,logres=None,logger=None):
             S += "%s %f " % (k,Dt[k][-1])
         if logger != None:
             logger.info("Speed: " + S)
+        sys.stdout.flush()
 
     for i in range(1,comm_size):
         comm.send("fika",dest=i,tag=1)

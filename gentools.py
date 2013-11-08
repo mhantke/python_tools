@@ -344,6 +344,7 @@ class Configuration:
         
         if isinstance(config,str):
             self.read_configfile(config)
+            self.configfile = config
         else:
             self.confDict = config
         

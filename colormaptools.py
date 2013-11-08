@@ -54,6 +54,31 @@ cdict_jet_lightbg = {'red':   [(0.0,1.0,1.0),
 
 cmaps = {"jet_lightbg":matplotlib.colors.LinearSegmentedColormap('jet_lightbg', cdict_jet_lightbg, 1024)}
 
+Nal = 4.
+al = [0.,0/Nal,1/Nal,2/Nal,3/Nal,4/Nal]
+cdict_jet_lightbg2 = {'red':   [(al[0],1.0,1.0),
+                                (al[1],0.0,0.0),
+                                (al[2],0.0,0.0),
+                                (al[3],1.0,1.0),
+                                (al[4],1.0,1.0),
+                                (al[5],0.5,0.5)],
+                     
+                      'green':  [(al[0],1.0,1.0),
+                                 (al[1],0.0,0.0),
+                                 (al[2],1.0,1.0),
+                                 (al[3],1.0,1.0),
+                                 (al[4],0.0,0.0),
+                                 (al[5],0.0,0.0)],
+                     
+                      'blue':  [(al[0],1.0,1.0),
+                                (al[1],1.0,1.0),
+                                (al[2],1.0,1.0),
+                                (al[3],0.0,0.0),
+                                (al[4],0.0,0.0),
+                                (al[5],0.0,0.0)]}
+
+cmaps = {"jet_lightbg2":matplotlib.colors.LinearSegmentedColormap('jet_lightbg2', cdict_jet_lightbg2, 1024)}
+
 def make_colorbar(filename,Nx,Ny,colormap=cm.jet,orientation="vertical"):
     X,Y = meshgrid(arange(Nx),arange(Ny))
     if orientation == "vertical":

@@ -7,7 +7,7 @@
 
 
 from pylab import *
-import h5py,os
+import h5py,os,numpy,time
 
 # CXI pixelmask bits
 PIXEL_IS_PERFECT = 0
@@ -21,11 +21,16 @@ PIXEL_IS_TO_BE_IGNORED = 64
 PIXEL_IS_BAD = 128
 PIXEL_IS_OUT_OF_RESOLUTION_LIMITS = 256
 PIXEL_IS_MISSING = 512
-PIXEL_IS_IN_MASK = PIXEL_IS_INVALID |  PIXEL_IS_SATURATED | PIXEL_IS_HOT | PIXEL_IS_DEAD | PIXEL_IS_SHADOWED | PIXEL_IS_IN_PEAKMASK | PIXEL_IS_TO_BE_IGNORED | PIXEL_IS_BAD | PIXEL_IS_MISSING 
+PIXEL_IS_IN_HALO = 1024
+PIXEL_IS_ARTIFACT_CORRECTED = 2048
+PIXEL_IS_IN_MASK = PIXEL_IS_INVALID |  PIXEL_IS_SATURATED | PIXEL_IS_HOT | PIXEL_IS_DEAD | PIXEL_IS_SHADOWED | PIXEL_IS_IN_PEAKMASK | PIXEL_IS_TO_BE_IGNORED | PIXEL_IS_BAD | PIXEL_IS_MISSING
+
+CXIWRITER_DS_ACCUMULATIVE_PATTERN = -2
+CXIWRITER_DS_SINGLE = -1
 
 class CXIWriter:
     def __init__(self,filename,N,logger=None):
-        self.filename = filename
+        self.filename = os.path.expandvars(filename)
         self.f = h5py.File(filename,"w")
         self.N = N
         self.logger = logger
@@ -36,12 +41,13 @@ class CXIWriter:
                 if name not in self.f:
                     self.f.create_group(name)
                 self.write(d[k],name)
-            else:
+            elif k != "i":
                 self.write_to_dataset(name,d[k],d.get("i",-1))
     def write_to_dataset(self,name,data,i):
         #if self.logger != None:
         #    self.logger.info("Write dataset %s of event %i." % (name,i))
         if name not in self.f:
+            t0 = time.time()
             if isscalar(data):
                 if i == -1:
                     s = [1]
@@ -59,6 +65,9 @@ class CXIWriter:
                 axes = "experiment_identifier:y:x"
             self.f.create_dataset(name,s,t)
             self.f[name].attrs.modify("axes",axes)
+            t1 = time.time()
+            if self.logger != None:
+                self.logger.info("Create dataset %s within %.1f sec.",name,t1-t0)
         if i == -1:
             if isscalar(data):
                 self.f[name][0] = data
@@ -74,13 +83,16 @@ class CXIWriter:
 
 class CXIReader:
     # location can be either a file or a directory
-    def __init__(self,location,dsnames={},**kwargs):
+    def __init__(self,location,dsnames_stack={},**kwargs):
         self.logger = kwargs.get("logger",None)
         nevents = kwargs.get("nevents",0)
         ifirst = kwargs.get("ifirst",0)
         def_stack_ds = kwargs.get("def_stack_ds","/i")
         pick_events = kwargs.get("pick_events","in_sequence")
         event_filters = kwargs.get("event_filters",{})
+        sorting_dsname = kwargs.get("sorting_dataset",None)
+        self.dsnames_single = kwargs.get("dsnames_single",None)
+        self.dsnames_stack = dsnames_stack
 
         [self.directories,self.filenames] = self._resolve_location(location)
         self.ifile = 0
@@ -108,16 +120,16 @@ class CXIReader:
         for N in self.Nevents_files: to_process.append(ones(N,dtype="bool"))
         to_process = self._filter_events(to_process,event_filters)
         to_process = self._pick_events(to_process,pick_events,ifirst,nevents)
-        self.Nevents_process = 0
-        for N in to_process: self.Nevents_process += N.sum()
         self.is_event_to_process = to_process
         self.ievent_process = -1
+        self.Nevents_process = 0
+        for N in to_process: self.Nevents_process += N.sum()
 
-        self.dsnames = dsnames
+        self.order = self._set_order(to_process,sorting_dsname)
 
     def get_next(self):
         if self._next():
-            return self._get(self.dsnames)
+            return self._get(self.dsnames_stack,self.dsnames_single)
         else:
             return None
 
@@ -133,7 +145,8 @@ class CXIReader:
         if self.ifile_opened != None:
             self.F.close()
 
-    def _resolve_location(self,location):
+    def _resolve_location(self,location0):
+        location = os.path.expandvars(location0)
         if os.path.isdir(location):
             fs = filter(lambda x: x[-4:] == ".cxi",os.listdir(location))
             fs.sort()
@@ -200,8 +213,11 @@ class CXIReader:
                         if self.logger != None:
                             self.logger.warning("Filter indices are applied to every file!")
                     F = zeros_like(to_process[i])
-                    for index in flt["indices"]:
-                        F[filter_ds == index] = True
+                    if not isinstance(flt["indices"],list):
+                        F[filter_ds == flt["indices"]] = True
+                    else:
+                        for index in flt["indices"]:
+                            F[filter_ds == index] = True
                 else:
                     if self.logger != None:
                         self.logger.warning("No valid filter arguments given for filter %s!" % flt_name)
@@ -211,6 +227,22 @@ class CXIReader:
                     self.logger.info("Filter %s - yield %.3f %% -> total yield %.3f %%",flt_name,100.*F.sum()/len(F),100.*to_process[i].sum()/len(F))
                     self.logger.info("Filter %s - First index: %i",flt_name,(arange(len(to_process[i]))[to_process[i]])[0])
         return to_process
+
+    def _set_order(self,to_process,sorting_dsname):
+        order = []
+        for (i,Nevents_fle,dty,fle) in zip(range(self.Nfiles),self.Nevents_files,self.directories,self.filenames):
+            if sorting_dsname == None:
+                order.append(numpy.arange(Nevents_fle))
+            else:
+                order.append(numpy.zeros(Nevents_fle))
+                if self.logger != None:
+                    self.logger.info("Set order of events in %s/%s",dty,fle)
+                f = h5py.File(dty+"/"+fle,"r")
+                sortdata = f[sorting_dsname]
+                order[i][:] = argsort(sortdata)[:]
+                f.close()
+        return order
+
 
     # move to next event that shall be processed
     def _next(self):
@@ -232,7 +264,7 @@ class CXIReader:
                     self.logger.info("Reached end of file (%i) %s/%s.",self.ifile,self.directories[self.ifile],self.filenames[self.ifile])
                 self.ifile += 1
                 self.ievent_file = -1
-            if self.is_event_to_process[self.ifile][self.ievent_file] == False:
+            if self.is_event_to_process[self.ifile][self.order[self.ifile][self.ievent_file]] == False:
                 pass
                 #if self.logger != None:
                 #    self.logger.info("Skip event %i in file %i.",self.ievent_file,self.ifile)
@@ -252,13 +284,18 @@ class CXIReader:
             self.F = h5py.File(self.directories[self.ifile]+'/'+self.filenames[self.ifile],'r')
             self.ifile_opened = self.ifile
         
-    def _get(self,dsnames):
+    def _get(self,dsnames_stack,dsnames_single):
         self._open_file()
         D = {}
         D["i"] = self.ievent_process
-        for (key,dsname) in dsnames.items():
-            D[key] = self.F[dsname][self.ievent_file].copy()
+        if dsnames_stack != None:
+            for (key,dsname) in dsnames_stack.items():
+                D[key] = self.F[dsname][self.order[self.ifile][self.ievent_file]].copy()
+        if dsnames_single != None:
+            for (key,dsname) in dsnames_single.items():
+                D[key] = self.F[dsname][:].copy()
         return D
+
 
 def get_filters(C):
     filters = filter(lambda x: "filter" in x,C.keys())
@@ -268,18 +305,72 @@ def get_filters(C):
     return Cfilters
 
 
-def cxi_to_spimage(filename,i,ds_img="/entry_1/image_2/data",ds_msk="/entry_1/image_2/mask"):
-    import spimage
-    f = h5py.File(filename,"r")
-    img_cxi = f[ds_img][i,:,:]
-    img_cxi[img_cxi<0] = 0
-    msk_cxi = f[ds_msk][i,:,:]
-    Nx = msk_cxi.shape[1]
-    Ny = msk_cxi.shape[0]
-    img = spimage.sp_image_alloc(Nx,Ny,1)
-    img.image[:,:] = img_cxi[:,:]
-    img.mask[:,:] = (msk_cxi[:,:] & PIXEL_IS_IN_MASK) == 0
-    filename_new = filename[:-4] + ("_%i.h5" % i)
-    spimage.sp_image_write(img,filename_new,0)
-    spimage.sp_image_free(img)
+def intensities_cxi_to_h5(filename_input,filename_output,slice_i,ds_img="/imgXxX",ds_msk="/mskXxX",ds_cx=None,ds_cy=None,cropLength=None):
+    f = h5py.File(filename_input,"r")
+    cx = None
+    cy = None
+    if ds_cx != None:
+        cx = f[ds_cx][slice_i]
+    if ds_cy != None:
+        cy = f[ds_cy][slice_i]
+    img = f[ds_img][slice_i,:,:]
+    img[img<0] = 0
+    msk = f[ds_msk][slice_i,:,:]
+    intensities_array_to_h5(img,msk,cx,cy,cropLength,filename_output)
     f.close()
+
+
+# expects shifted pattern (center roughly in the middle)
+def intensities_array_to_h5(img0,msk0,cx=None,cy=None,cropLength=None,save_to_file=None):
+    import spimage,imgtools
+    Nx = img0.shape[1]
+    Ny = img0.shape[0]
+    img = img0
+    msk = msk0
+    if cropLength != None:
+        img = imgtools.crop(img0,cropLength,center=[cy,cx])
+        msk = imgtools.crop(msk0,cropLength,center=[cy,cx])
+        Nx = cropLength
+        Ny = cropLength
+    elif cx != None and cy != None:
+        img = imgtools.recenter(img0,cx,cy)
+        msk = imgtools.recenter(msk0,cx,cy)
+    I = spimage.sp_image_alloc(Nx,Ny,1)
+    I.image[:,:] = img[:,:]
+    I.mask[:,:] = msk[:,:]
+    I2 = spimage.sp_image_shift(I)
+    I2.shifted = 0
+    I2.phased = 0
+    spimage.sp_image_free(I)
+    if save_to_file != None:
+        spimage.sp_image_write(I2,save_to_file,0)
+    else:
+        return I2
+
+
+def write_sigma_map(filename_cheetah,scale=1.):
+    fc = h5py.File(filename_cheetah,"r+")
+    M = fc["/entry_1/image_2/mask"]
+    H = fc["/cheetah/shared/detector0_class0_sigma_downsampled"]
+    print "opened data"
+    electronics_sigma = 2.5
+    artifact_sigma = 50.
+    N = min([M.shape[1],M.shape[2]])
+    try:
+        fc.create_group("/sigma_map")
+    except:
+        print "Group already exists"
+    s = (M.shape[0],N,N)
+    t = "float"
+    axes = "experiment_identifier:y:x"
+    try:
+        fc.create_dataset("/sigma_map/data",s,t)
+        fc["/sigma_map/data"].attrs.modify("axes",axes)
+    except:
+        print "Dataset already exists"
+    for i in arange(s[0]):
+        print i,s[0]
+        fc["/sigma_map/data"][i,:,:] = (electronics_sigma+H[:N,:N]+((M[i,:N,:N] & PIXEL_IS_ARTIFACT_CORRECTED) != 0)*artifact_sigma)*scale
+    fc.close()
+
+
