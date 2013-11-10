@@ -1122,6 +1122,7 @@ def prtf(imgs0,msks0,**kwargs):
         img0 = imgs1[0,:,:].copy()
         msk0 = msks1[0,:,:].copy()
 
+
         if do_center_image and i==0:
             CM = center_of_mass(abs(img1)*msk1)
             img1 = pixel_translation(img1,CM,"nearest")
@@ -1159,6 +1160,8 @@ def prtf(imgs0,msks0,**kwargs):
         if do_phase_match and i!=0:
             weights = abs(img0)*abs(img1)
             img1 = abs(img1)*numpy.exp(1.j*(numpy.angle(img1)+phase_match(img0,img1,weights)))
+
+        
 
         imgs1[i,:,:] = img1[:,:]
         msks1[i,:,:] = msk1[:,:]
