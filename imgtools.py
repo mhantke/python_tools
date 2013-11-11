@@ -1350,53 +1350,27 @@ def half_pixel_downsampling(img0,msk0,downsampling=2,mode="conservative",cx=None
 def lanczos_interp(data,N_new_,a=2.):
     
     N_new = int(round(N_new_))
-    dim = len(data.shape)
     N = data.shape[0]
-
     fdata = pylab.fftn(data)
-    sfdata = pylab.fftshift(fdata)
-
-    if N_new%2 == 1:
-        c = N/2-1
-    else:
-        c = N/2
-
-    if dim == 1:
-        sfdata_cropped = sfdata[c-N_new/2:c-N_new/2+N_new]
-        X = (1.*pylab.arange(N_new)-N_new/2)/((N_new-1)/2.)
-        lanczos_kernel = (pylab.sinc(X*a)*pylab.sinc(X))
-
-    elif dim == 2:
-        if data.shape[0] != data.shape[1]:
-            print "ERROR: Only accept data with equal dimensions."
-            return
-
-        sfdata_cropped = sfdata[c-N_new/2:c-N_new/2+N_new,
-                                c-N_new/2:c-N_new/2+N_new]
-        X,Y = pylab.meshgrid((pylab.arange(N_new)-N_new/2)/((N_new-1)*2.),
-                             (pylab.arange(N_new)-N_new/2)/((N_new-1)*2.))
-        lanczos_kernel = pylab.sinc(X*a)*pylab.sinc(X)*pylab.sinc(Y*a)*pylab.sinc(Y)
-
-    elif dim == 3:
-        if data.shape[0] != data.shape[1] or data.shape[1] != data.shape[2]:
-            print "ERROR: Only accept data with equal dimensions."
-            return
-
-        sfdata_cropped = sfdata[c-N_new/2:c-N_new/2+N_new,
-                                c-N_new/2:c-N_new/2+N_new,
-                                c-N_new/2:c-N_new/2+N_new]
-        X,Y,Z = pylab.mgrid[:N_new,:N_new,:N_new]
-        X = (X-N_new/2)/(2.*(N_new-1))
-        Y = (Y-N_new/2)/(2.*(N_new-1))
-        Z = (Z-N_new/2)/(2.*(N_new-1))
-        lanczos_kernel = \
-            pylab.sinc(X*a)*pylab.sinc(X)* \
-            pylab.sinc(Y*a)*pylab.sinc(Y)* \
-            pylab.sinc(Z*a)*pylab.sinc(Z)
-
-    sfdata_cropped *= lanczos_kernel
-    fdata_cropped = pylab.fftshift(sfdata_cropped)
-    ffdata = pylab.ifftn(fdata_cropped)
-    norm_factor = N_new/(1.*N)
-    ffdata *= (N_new**dim/(1.*N)**dim)
-    return ffdata
+    d = len(list(data.shape))
+    s_new = tuple(d*[N_new])
+    f = numpy.indices(s_new)
+    lanczos_kernel = numpy.ones(shape=s_new)
+    fdata_new = numpy.ones(shape=s_new)
+    c = int(numpy.ceil(N_new/2.))
+    for i in range(d):
+        f[i] = f[i]-c
+        f[i,:] = numpy.fft.fftshift(f[i,:])[:]
+        lanczos_kernel *= (pylab.sinc(f[i,:]/(1.*c)**a)*pylab.sinc(f[i,:]/(1.*c)))
+        
+    N0 = min([N,N_new])
+    if d == 1:
+        fdata_new[c-N/2:c-N/2+N] = fdata[:]
+    if d == 2:
+        fdata_new[c-N/2:c-N/2+N,c-N/2:c-N/2+N] = fdata[:,:]
+    if d == 3:
+        fdata_new[c-N/2:c-N/2+N,c-N/2:c-N/2+N,c-N/2:c-N/2+N] = fdata[:,:,:]
+        
+    fdata_new[:] *= lanczos_kernel[:]
+    data_new = numpy.fft.ifftn(fdata_new) * N_new**d/(1.*N**d)
+    return data_new
