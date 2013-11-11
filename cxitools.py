@@ -68,6 +68,7 @@ class CXIWriter:
             t1 = time.time()
             if self.logger != None:
                 self.logger.info("Create dataset %s within %.1f sec.",name,t1-t0)
+
         if i == -1:
             if isscalar(data):
                 self.f[name][0] = data

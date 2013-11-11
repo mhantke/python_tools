@@ -57,7 +57,8 @@ def cone_pixel_average(image,N_theta,cx=None,cy=None):
 #    return [radii,values[0,:]]
 
 
-def center_of_mass(img0):
+def center_of_mass(img0,shifted=False):
+    debug = False
     img = abs(img0)
     img = img/(1.*img.sum()+numpy.finfo("float32").eps)
     d = len(list(img.shape))
@@ -65,8 +66,11 @@ def center_of_mass(img0):
     f = numpy.indices(img.shape)
     for i in range(d):
         f[i] = f[i]-numpy.ceil(img.shape[i]/2.)
-        f[i,:] = numpy.fft.fftshift(f[i,:])[:]
+        if not shifted:
+            f[i,:] = numpy.fft.fftshift(f[i,:])[:]
         cm[i] = (f[i,:]*img[:]).sum()
+        if debug:
+            pylab.imsave(this_folder+"/testdata/f%i.png" % i,f[i])
     return cm
 
 def cone_pixel_average_new(image,mask,N_theta,cx=None,cy=None,rdownsample=1):
@@ -359,6 +363,9 @@ def turnccw(array2d):
         array2d_turned[N-x,:] = array2d[:,x].T
     return array2d_turned
 
+def fft_turn180(I):
+    return numpy.fft.fftn(numpy.fft.fftn(I))/(1.*I.size)
+
 def turn180(img,cx=None,cy=None):
     if cx == None:
         cx1 = (img.shape[0]-1)/2
@@ -556,8 +563,6 @@ def smooth1d(arr1d,sm):
     kernel = pylab.zeros(N)
     kernel = pylab.exp(x**2/(1.0*sm**2))
     arr1d_new = pylab.convolve(arr1d,kernel,'same')
-    #print len(arr1d_new)
-    #print len(arr1d)
     return arr1d_new
 
 def smooth3d(arr3d,factor):
@@ -853,7 +858,7 @@ def phase_diff(imgA,imgB):
 
 
 # should be done with stsci.image package in the future
-def pixel_translation(A,t,method="linear"):
+def pixel_translation(A,t,method="linear",fill_value=0):
     from scipy.interpolate import griddata
     d = len(list(A.shape))
     g = numpy.indices(A.shape)
@@ -865,7 +870,7 @@ def pixel_translation(A,t,method="linear"):
         g[i] = g[i].flatten()
     gt = tuple(gt)
     g = tuple(g)
-    return griddata(g,A.flatten(),gt,method=method)
+    return griddata(g,A.flatten(),gt,method=method,fill_value=fill_value)
 
 # should be done with stsci.image package in the future
 def upsample(A,f,method="linear"):
@@ -905,6 +910,7 @@ def fourier_translation_test():
     pylab.imsave("testdata/fourier_translation_test_B.png",B,cmap=pylab.cm.gray,vmin=A.min(),vmax=B.max())
 
 def recover_translation(imgA,imgB,enantio=False):
+    debug = False
     imgfA = numpy.fft.fftn(imgA)
     imgfB = numpy.fft.fftn(imgB)
     d = len(list(imgfA.shape))
@@ -918,31 +924,33 @@ def recover_translation(imgA,imgB,enantio=False):
         c = abs(numpy.fft.ifftn(imgfA*imgfB.conj()))
         turned = False
     else:
-        imgB_turned = turnccw(turnccw(imgB))
+        imgB_turned = fft_turn180(imgB)
         imgfB_turned = numpy.fft.fftn(imgB_turned)
         # Check superposition with normal and rotated image
         cc = [abs(numpy.fft.ifftn(imgfA*imgfB.conj())),abs(numpy.fft.ifftn(imgfA*imgfB_turned.conj()))]
-        #pylab.imsave("testdata/CC0.png",cc[0])
-        #pylab.imsave("testdata/CC1.png",cc[1])
+        if debug:
+            os.system("rm %s/testdata/RT*" % this_folder)
+            pylab.imsave(this_folder+"/testdata/RT_imgB_turned.png",abs(numpy.fft.fftshift(imgB_turned)),vmin=0.,vmax=abs(imgB).max())
+            pylab.imsave(this_folder+"/testdata/RT_imgB.png",abs(numpy.fft.fftshift(imgB)),vmin=0.,vmax=abs(imgB).max())
+            pylab.imsave(this_folder+"/testdata/RT_imgA.png",abs(numpy.fft.fftshift(imgA)),vmin=0.,vmax=abs(imgB).max())
+            pylab.imsave(this_folder+"/testdata/RT_imgfB_turned.png",abs(numpy.fft.fftshift(imgfB_turned)),vmin=0.,vmax=abs(imgfB).max())
+            pylab.imsave(this_folder+"/testdata/RT_imgfB.png",abs(numpy.fft.fftshift(imgfB)),vmin=0.,vmax=abs(imgfB).max())
+            pylab.imsave(this_folder+"/testdata/RT_imgfA.png",abs(numpy.fft.fftshift(imgfA)),vmin=0.,vmax=abs(imgfB).max())
+            pylab.imsave(this_folder+"/testdata/RT_CC0_%i.png" % k,cc[0])
+            pylab.imsave(this_folder+"/testdata/RT_CC1_%i.png" % k,cc[1])
         Mcc = numpy.array([cc[0].max(),cc[1].max()])
         i_max = Mcc.argmax()
         if i_max == 0:
-            #imgB_new = imgB
             turned = False
             c = cc[0]
         else:
-            #imgB_new = imgB_turned
             turned = True
             c = cc[1]
     index_max = c.argmax()
     translation = []
     for i in range(d):
         translation.append(f[i,:].flatten()[index_max])
-        #pylab.imsave("testdata/t%i.png" % i,f[i,:,:])
     translation = numpy.array(translation)
-    #pylab.imsave("testdata/match.png",(f[0,:,:]==translation[0])*(f[1,:,:]==translation[1]))
-    #pylab.imsave("testdata/matchc.png",c)
-    #pylab.imsave("testdata/temp.png",B,cmap=pylab.cm.gray)
     return [translation,turned]
 
 # This functions translates image b so that it's phases 
@@ -954,7 +962,7 @@ def maximize_overlap(imgA0,imgB0,enantio=False):
     imgA = imgA0.copy()
     imgB = imgB0.copy()
     [translation,turned] = recover_translation(imgA,imgB,enantio)
-    if turned: imgB = turnccw(turnccw(imgB))
+    if turned: imgB = fft_turn180(imgB)
     imgB = fourier_translation(imgB,translation)
     return [imgB,translation,turned]
 
@@ -967,7 +975,7 @@ def maximize_overlap_test():
     A = A[:,:]
     t = [-43,-23]
     B0 = abs(fourier_translation(A,t))
-    for i,B in zip(range(2),[B0,turnccw(turnccw(B0))]):
+    for i,B in zip(range(2),[B0,fft_turn180(B0)]):
         C = maximize_overlap(A,B,True)
         print "Difference %i: %f" % (i,abs(A-C).sum())
         pylab.imsave("testdata/maximize_overlap_test_%i_A.png" % i,A,cmap=pylab.cm.gray)
@@ -1020,7 +1028,7 @@ def maximize_phase_match(imgA,imgB,enantio=False):
 # output: real space and fourier space data
 def minimize_phase_ramp(img,shifted=False,periodic_boundary=False):
     from scipy.optimize import leastsq,fmin_cobyla
-    
+    debug = True
     imgf = numpy.fft.fftn(numpy.fft.fftshift(img))
     pimgf = numpy.angle(imgf)+numpy.pi
 
@@ -1064,12 +1072,11 @@ def minimize_phase_ramp(img,shifted=False,periodic_boundary=False):
         resf = numpy.fft.fftshift(resf)
         res = numpy.fft.fftshift(res)
 
-
-    translation = v2[1:]/(2*numpy.pi)*numpy.array(pimgf.shape)
-    #pylab.imsave(this_folder+"/testdata/subtract_phase_ramp_pimgf.png",pimgf)
-    #pylab.imsave(this_folder+"/testdata/subtract_phase_ramp_pv1.png",p(v1))
-    #pylab.imsave(this_folder+"/testdata/subtract_phase_ramp_pv2.png",p(v2))
-
+    translation = (v2[1:]-numpy.pi)/(2*numpy.pi)*numpy.array(pimgf.shape)
+    if debug:
+        pylab.imsave(this_folder+"/testdata/subtract_phase_ramp_img0.png",abs(img))
+        pylab.imsave(this_folder+"/testdata/subtract_phase_ramp_img1.png",abs(res))
+        pylab.imsave(this_folder+"/testdata/subtract_phase_ramp_img0t.png",abs(fourier_translation(img,translation)))
     return [res,translation]
 
 
@@ -1086,14 +1093,27 @@ def phase_match(imgA,imgB,weights=None): # typically weights = (abs(imgA)*abs(im
 
 
 def prtf(imgs0,msks0,**kwargs):
+    debug = False
+    K = numpy.random.randint(1000)
     enantio = kwargs.get("enantio",False)
+    if enantio and debug: print "do enantio"
     shifted = kwargs.get("shifted",True)
+    if shifted and debug: print "images are shifted"
     do_center_image = kwargs.get("center_image",False)
+    if do_center_image and debug: print "centering image"
     pixels_to_exclude = kwargs.get("pixels_to_exclude",None)
     do_maximize_overlap = kwargs.get("maximize_overlap",True)
+    if do_maximize_overlap and debug: print "maximizing overlap"
     do_minimize_phase_ramp = kwargs.get("minimize_phase_ramp",False)
+    if do_minimize_phase_ramp and debug: print "minimizing phase ramp"
     do_phase_match = kwargs.get("real_space_phase_match",True)
-    do_align_com_support = kwargs.get("align_com_support",True)
+    if do_phase_match and debug: print "matching real space"
+    do_align_com_support = kwargs.get("align_com_support",False)
+    if do_align_com_support and debug: print "aligning center of mass of support"
+
+    if debug:
+        os.system("rm %s/testdata/prtf*" % this_folder)
+
     Nx = imgs0.shape[2]
     Ny = imgs0.shape[1]
     cx = kwargs.get("cx",(Nx-1)/2.)
@@ -1111,6 +1131,11 @@ def prtf(imgs0,msks0,**kwargs):
             else:
                 imgs[k,:,:] = imgs0[i,:,:]
                 msks[k,:,:] = msks0[i,:,:]
+            if debug and False:
+                pylab.imsave(this_folder+"/testdata/prtf_%i_imgs%i.png" % (K,k),abs(imgs[k]))
+                pylab.imsave(this_folder+"/testdata/prtf_%i_msks%i.png" % (K,k),abs(msks[k]))
+                pylab.imsave(this_folder+"/testdata/prtf_%i_imgs0%i.png" % (K,k),abs(imgs0[i]))
+                pylab.imsave(this_folder+"/testdata/prtf_%i_msks0%i.png" % (K,k),abs(msks0[i]))
             k += 1
     # Average reconstructions
     # superimpose for obtaining the averaged result of the reconstruction
@@ -1122,49 +1147,45 @@ def prtf(imgs0,msks0,**kwargs):
         img0 = imgs1[0,:,:].copy()
         msk0 = msks1[0,:,:].copy()
 
-
-        if do_center_image and i==0:
-            CM = center_of_mass(abs(img1)*msk1)
-            img1 = pixel_translation(img1,CM,"nearest")
-            msk1 = pixel_translation(msk1,CM,"nearest")
-
+        if debug:
+            j=0
+            pylab.imsave(this_folder+"/testdata/prtf_%i_%i_I_%i.png" % (K,i,j),abs(img1),vmin=0.,vmax=3.)
+            pylab.imsave(this_folder+"/testdata/prtf_%i_%i_IP_%i.png" % (K,i,j),numpy.angle(img1) % (2.*numpy.pi),vmin=0.,vmax=2.*numpy.pi)
+            pylab.imsave(this_folder+"/testdata/prtf_%i_%i_M_%i.png" % (K,i,j),abs(msk1))
         if do_minimize_phase_ramp:
             [img1,translation] = minimize_phase_ramp(img1,shifted=False,periodic_boundary=True)
             msk1 = numpy.int16(abs(fourier_translation(msk1,translation)).round())
-            if enantio:
-                img1_turned = turnccw(turnccw(img1))
-                msk1_turned = turnccw(turnccw(msk1))
-                if ((img1.shape[0] % 2) == 0) or ((img1.shape[1] % 2) == 0):
-                    tx = int((img1.shape[1] % 2) == 0) * -1
-                    ty = int((img1.shape[0] % 2) == 0) * -1
-                    img1_turned = pixel_translation(img1_turned,[ty,tx],"nearest")
-                    msk1_turned = pixel_translation(msk1_turned,[ty,tx],"nearest")
-                diff_not_turned = (abs(msk0)-abs(msk1))**2
-                diff_turned = (abs(msk0)-abs(msk1_turned))**2
-
-                #pylab.imsave(this_folder+"/testdata/prtf_diff_not_turned_%i.png" % i,numpy.fft.fftshift(diff_not_turned))
-                #pylab.imsave(this_folder+"/testdata/prtf_diff_turned_%i.png" % i,numpy.fft.fftshift(diff_turned))
-                #pylab.imsave(this_folder+"/testdata/prtf_img0_%i.png" % i,numpy.fft.fftshift(abs(img0)))
-                #pylab.imsave(this_folder+"/testdata/prtf_img1_%i.png" % i,numpy.fft.fftshift(abs(img1)))
-                #pylab.imsave(this_folder+"/testdata/prtf_img1_turned_%i.png" % i,numpy.fft.fftshift(abs(img1_turned)))
-
-                if abs(diff_turned).sum() < abs(diff_not_turned).sum():
-                    img1 = img1_turned
-                    msk1 = msk1_turned
         
+        
+        if debug:
+            j+=1
+            pylab.imsave(this_folder+"/testdata/prtf_%i_%i_I_%i.png" % (K,i,j),abs(img1),vmin=0.,vmax=3.)
+            pylab.imsave(this_folder+"/testdata/prtf_%i_%i_IP_%i.png" % (K,i,j),numpy.angle(img1) % (2.*numpy.pi),vmin=0.,vmax=2.*numpy.pi)
+            pylab.imsave(this_folder+"/testdata/prtf_%i_%i_A_M_%i.png" % (K,i,j),abs(msk1))
         if do_maximize_overlap and i!=0:
             [img1,translation,turned] = maximize_overlap(img0,img1,enantio)
-            if turned: msk1 = numpy.fft.fftshift(turnccw(turnccw(numpy.fft.fftshift(msk1))))
+            if turned: msk1 = fft_turn180(msk1)
             msk1 = abs(fourier_translation(msk1,translation))
 
+        if debug:
+            j+=1
+            pylab.imsave(this_folder+"/testdata/prtf_%i_%i_I_%i.png" % (K,i,j),abs(img1),vmin=0.,vmax=3.)
+            pylab.imsave(this_folder+"/testdata/prtf_%i_%i_IP_%i.png" % (K,i,j),numpy.angle(img1) % (2.*numpy.pi),vmin=0.,vmax=2.*numpy.pi)
+            pylab.imsave(this_folder+"/testdata/prtf_%i_%i_A_M_%i.png" % (K,i,j),abs(msk1))
         if do_phase_match and i!=0:
             weights = abs(img0)*abs(img1)
             img1 = abs(img1)*numpy.exp(1.j*(numpy.angle(img1)+phase_match(img0,img1,weights)))
 
-        
-
+        if debug:
+            j+=1
+            pylab.imsave(this_folder+"/testdata/prtf_%i_%i_I_%i.png" % (K,i,j),abs(img1),vmin=0.,vmax=3.)
+            pylab.imsave(this_folder+"/testdata/prtf_%i_%i_IP_%i.png" % (K,i,j),numpy.angle(img1) % (2.*numpy.pi),vmin=0.,vmax=2.*numpy.pi)
+            pylab.imsave(this_folder+"/testdata/prtf_%i_%i_A_M_%i.png" % (K,i,j),abs(msk1))
+            print "Power: %f" % (abs(img1).sum()/abs(img0).sum())
+            print "Avg. phase: %f,%f" % ((msk0*numpy.angle(img1)).mean(),(msk0*numpy.angle(img0)).mean())
+            print "Diff: %f" % (abs(img1-img0).mean()/abs(img0).mean())
         imgs1[i,:,:] = img1[:,:]
-        msks1[i,:,:] = msk1[:,:]
+        msks1[i,:,:] = numpy.int16(abs(msk1).round())[:,:]
     imgs1_super = imgs1.mean(0)
     msks1_super = msks1.mean(0)
     # Make PRTF
@@ -1184,24 +1205,32 @@ def prtf(imgs0,msks0,**kwargs):
     PRTF[(fimgs == 0).sum(0) != 0] = 0.
     PRTF = numpy.array(PRTF,dtype="float32")
 
-    if do_align_com_support:
-        com = center_of_mass((msk1==1))
-        if com[0] > 0:
-            imgs1_super = turnccw(turnccw(imgs1_super))
-            msks1_super = turnccw(turnccw(msks1_super))
+    if debug:
+        pylab.imsave(this_folder+"/testdata/superI%i.png" % numpy.random.randint(1000),abs(imgs1_super),vmin=0,vmax=2.)
+        pylab.imsave(this_folder+"/testdata/superM%i.png" % numpy.random.randint(1000),abs(msks1_super),vmin=0,vmax=1.)
 
     if do_center_image:
-        CM = center_of_mass(abs(imgs1_super)*msks1_super)
-        imgs1_super = pixel_translation(imgs1_super,CM,"nearest")
-        msks1_super = pixel_translation(msks1_super,CM,"nearest")
+        CM = center_of_mass(msks1_super)
+        imgs1_super = pixel_translation(imgs1_super,-CM,"nearest")
+        msks1_super = pixel_translation(msks1_super,-CM,"nearest")
+
+    if do_align_com_support:
+        com = center_of_mass(msks1_super)
+        if com[0] > 0 and com[1] > 0:
+            imgs1_super = fft_turn180(imgs1_super)
+            msks1_super = fft_turn180(msks1_super)
 
     if shifted:
         imgs1_super = numpy.fft.fftshift(imgs1_super)
         msks1_super = numpy.fft.fftshift(msks1_super)
         for i in range(N):
+            fimgs1[i,:,:] = numpy.fft.fftshift(fimgs1[i,:,:])
             imgs1[i,:,:] = numpy.fft.fftshift(imgs1[i,:,:])
             msks1[i,:,:] = numpy.fft.fftshift(msks1[i,:,:])
         PRTF = numpy.fft.fftshift(PRTF)
+
+    msks1_super = numpy.int16(msks1_super)
+    msks1 = numpy.int16(msks1)
     return [PRTF,imgs1_super,msks1_super,imgs1,msks1,fimgs1]
 
 def half_period_resolution(PRTF,pixel_edge_length,detector_distance,wavelength,cx=None,cy=None):
@@ -1318,3 +1347,56 @@ def half_pixel_downsampling(img0,msk0,downsampling=2,mode="conservative",cx=None
     return [imgXxX0,mskXxX0,imgXxX1,mskXxX1]
 
 
+def lanczos_interp(data,N_new_,a=2.):
+    
+    N_new = int(round(N_new_))
+    dim = len(data.shape)
+    N = data.shape[0]
+
+    fdata = pylab.fftn(data)
+    sfdata = pylab.fftshift(fdata)
+
+    if N_new%2 == 1:
+        c = N/2-1
+    else:
+        c = N/2
+
+    if dim == 1:
+        sfdata_cropped = sfdata[c-N_new/2:c-N_new/2+N_new]
+        X = (1.*pylab.arange(N_new)-N_new/2)/((N_new-1)/2.)
+        lanczos_kernel = (pylab.sinc(X*a)*pylab.sinc(X))
+
+    elif dim == 2:
+        if data.shape[0] != data.shape[1]:
+            print "ERROR: Only accept data with equal dimensions."
+            return
+
+        sfdata_cropped = sfdata[c-N_new/2:c-N_new/2+N_new,
+                                c-N_new/2:c-N_new/2+N_new]
+        X,Y = pylab.meshgrid((pylab.arange(N_new)-N_new/2)/((N_new-1)*2.),
+                             (pylab.arange(N_new)-N_new/2)/((N_new-1)*2.))
+        lanczos_kernel = pylab.sinc(X*a)*pylab.sinc(X)*pylab.sinc(Y*a)*pylab.sinc(Y)
+
+    elif dim == 3:
+        if data.shape[0] != data.shape[1] or data.shape[1] != data.shape[2]:
+            print "ERROR: Only accept data with equal dimensions."
+            return
+
+        sfdata_cropped = sfdata[c-N_new/2:c-N_new/2+N_new,
+                                c-N_new/2:c-N_new/2+N_new,
+                                c-N_new/2:c-N_new/2+N_new]
+        X,Y,Z = pylab.mgrid[:N_new,:N_new,:N_new]
+        X = (X-N_new/2)/(2.*(N_new-1))
+        Y = (Y-N_new/2)/(2.*(N_new-1))
+        Z = (Z-N_new/2)/(2.*(N_new-1))
+        lanczos_kernel = \
+            pylab.sinc(X*a)*pylab.sinc(X)* \
+            pylab.sinc(Y*a)*pylab.sinc(Y)* \
+            pylab.sinc(Z*a)*pylab.sinc(Z)
+
+    sfdata_cropped *= lanczos_kernel
+    fdata_cropped = pylab.fftshift(sfdata_cropped)
+    ffdata = pylab.ifftn(fdata_cropped)
+    norm_factor = N_new/(1.*N)
+    ffdata *= (N_new**dim/(1.*N)**dim)
+    return ffdata
