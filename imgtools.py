@@ -150,32 +150,36 @@ def draw_circle(Nx,Ny,diameter):
     circle[circle!=0] = 1
     return circle
 
-def gaussian_smooth(I,sm,precision=2):
-    N = numpy.ceil(precision*sm)
+def gaussian_smooth(I,sm,precision=1.):
+    N = 2*int(numpy.round(precision*sm))+1
     if len(I.shape) == 2:
         import scipy.signal
         X,Y = pylab.meshgrid(pylab.arange(0,N,1),pylab.arange(0,N,1))
-        X = X-(N-1)/2.
-        Y = Y-(N-1)/2.
+        X = X-N/2
+        Y = Y-N/2
         R = pylab.sqrt(X**2 + Y**2)
-        kernel = pylab.exp(R**2/(1.0*sm**2))
-        Ism = scipy.signal.convolve2d(I,pylab.fftshift(kernel),mode='same',boundary='fill')
+        kernel = pylab.exp(R**2/(2.0*sm**2))
+        kernel[abs(R)>N/2] = 0.
+        kernel /= kernel.sum()
+        Ism = scipy.signal.convolve2d(I,kernel,mode='same',boundary='fill')
         return Ism
     elif len(I.shape) == 1:
         X = pylab.arange(0,N,1)
         X = X-(N-1)/2.
-        kernel = pylab.exp(X**2/(1.0*sm**2))
-        Ism = pylab.convolve(I,pylab.fftshift(kernel),mode='same')
+        kernel = pylab.exp(X**2/(2.0*sm**2))
+        kernel /= kernel.sum()
+        Ism = pylab.convolve(I,kernel,mode='same')
         return Ism
 
-def gaussian_smooth_2d1d(I,sm):
-    N = 2*sm
+def gaussian_smooth_2d1d(I,sm,precision=1.):
+    N = 2*int(numpy.round(precision*sm))+1
     if len(I.shape) == 2:
         import scipy.signal
-        kernel = pylab.zeros(shape=(1+2*sm,1+2*sm))
+        kernel = pylab.zeros(shape=(N,N))
         X,Y = pylab.meshgrid(pylab.arange(0,N,1),pylab.arange(0,N,1))
-        X = X-(N-1)/2.
-        kernel = pylab.exp(X**2/(1.0*sm**2))
+        X = X-N/2
+        kernel = pylab.exp(X**2/(2.0*sm**2))
+        kernel /= kernel.sum()
         Ism = scipy.signal.convolve2d(I,kernel,mode='same',boundary='wrap')
         return Ism
     elif len(I.shape) == 1:
