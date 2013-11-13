@@ -877,20 +877,18 @@ def pixel_translation(A,t,method="linear",fill_value=0):
     return griddata(g,A.flatten(),gt,method=method,fill_value=fill_value)
 
 # should be done with stsci.image package in the future
-def upsample(A,f,method="linear"):
+def upsample(A,f,order=1):
     from scipy.interpolate import griddata
+    #from scipy.interpolate import interp2d
+    from scipy import ndimage
     d = len(list(A.shape))
     g = numpy.indices(A.shape)
     new_shape = tuple((numpy.array(A.shape)*f).round())
-    gt = numpy.indices(new_shape)
-    gt = list(gt)
-    g = list(g)
+    gt = numpy.float64(numpy.indices(new_shape))
     for i in range(d):
-        gt[i] = (gt[i].flatten()/(1.*f)) % (A.shape[i]-1.)
-        g[i] = g[i].flatten()
-    gt = tuple(gt)
-    g = tuple(g)
-    return griddata(g,A.flatten(),gt,method=method).reshape(new_shape)
+        gt[i] = (gt[i]/(1.*f))
+    return ndimage.map_coordinates(A, gt, order=order)
+
 
 # t = [t0,t1,...] (transferred into python from libspimage)
 def fourier_translation(A,t,rotation=False):
@@ -1362,30 +1360,3 @@ def half_pixel_downsampling(img0,msk0,downsampling=2,mode="conservative",cx=None
     return [imgXxX0,mskXxX0,imgXxX1,mskXxX1]
 
 
-def lanczos_interp(data,N_new_,a=2.):
-    
-    N_new = int(round(N_new_))
-    N = data.shape[0]
-    fdata = pylab.fftn(data)
-    d = len(list(data.shape))
-    s_new = tuple(d*[N_new])
-    f = numpy.indices(s_new)
-    lanczos_kernel = numpy.ones(shape=s_new)
-    fdata_new = numpy.ones(shape=s_new)
-    c = int(numpy.ceil(N_new/2.))
-    for i in range(d):
-        f[i] = f[i]-c
-        f[i,:] = numpy.fft.fftshift(f[i,:])[:]
-        lanczos_kernel *= (pylab.sinc(f[i,:]/(1.*c)**a)*pylab.sinc(f[i,:]/(1.*c)))
-        
-    N0 = min([N,N_new])
-    if d == 1:
-        fdata_new[c-N/2:c-N/2+N] = fdata[:]
-    if d == 2:
-        fdata_new[c-N/2:c-N/2+N,c-N/2:c-N/2+N] = fdata[:,:]
-    if d == 3:
-        fdata_new[c-N/2:c-N/2+N,c-N/2:c-N/2+N,c-N/2:c-N/2+N] = fdata[:,:,:]
-        
-    fdata_new[:] *= lanczos_kernel[:]
-    data_new = numpy.fft.ifftn(fdata_new) * N_new**d/(1.*N**d)
-    return data_new
