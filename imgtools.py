@@ -150,32 +150,36 @@ def draw_circle(Nx,Ny,diameter):
     circle[circle!=0] = 1
     return circle
 
-def gaussian_smooth(I,sm,precision=2):
-    N = numpy.ceil(precision*sm)
+def gaussian_smooth(I,sm,precision=1.):
+    N = 2*int(numpy.round(precision*sm))+1
     if len(I.shape) == 2:
         import scipy.signal
         X,Y = pylab.meshgrid(pylab.arange(0,N,1),pylab.arange(0,N,1))
-        X = X-(N-1)/2.
-        Y = Y-(N-1)/2.
+        X = X-N/2
+        Y = Y-N/2
         R = pylab.sqrt(X**2 + Y**2)
-        kernel = pylab.exp(R**2/(1.0*sm**2))
-        Ism = scipy.signal.convolve2d(I,pylab.fftshift(kernel),mode='same',boundary='fill')
+        kernel = pylab.exp(R**2/(2.0*sm**2))
+        kernel[abs(R)>N/2] = 0.
+        kernel /= kernel.sum()
+        Ism = scipy.signal.convolve2d(I,kernel,mode='same',boundary='fill')
         return Ism
     elif len(I.shape) == 1:
         X = pylab.arange(0,N,1)
         X = X-(N-1)/2.
-        kernel = pylab.exp(X**2/(1.0*sm**2))
-        Ism = pylab.convolve(I,pylab.fftshift(kernel),mode='same')
+        kernel = pylab.exp(X**2/(2.0*sm**2))
+        kernel /= kernel.sum()
+        Ism = pylab.convolve(I,kernel,mode='same')
         return Ism
 
-def gaussian_smooth_2d1d(I,sm):
-    N = 2*sm
+def gaussian_smooth_2d1d(I,sm,precision=1.):
+    N = 2*int(numpy.round(precision*sm))+1
     if len(I.shape) == 2:
         import scipy.signal
-        kernel = pylab.zeros(shape=(1+2*sm,1+2*sm))
+        kernel = pylab.zeros(shape=(N,N))
         X,Y = pylab.meshgrid(pylab.arange(0,N,1),pylab.arange(0,N,1))
-        X = X-(N-1)/2.
-        kernel = pylab.exp(X**2/(1.0*sm**2))
+        X = X-N/2
+        kernel = pylab.exp(X**2/(2.0*sm**2))
+        kernel /= kernel.sum()
         Ism = scipy.signal.convolve2d(I,kernel,mode='same',boundary='wrap')
         return Ism
     elif len(I.shape) == 1:
@@ -1092,22 +1096,28 @@ def phase_match(imgA,imgB,weights=None): # typically weights = (abs(imgA)*abs(im
 
 def prtf(imgs0,msks0,**kwargs):
     debug = False
+    logger = kwargs.get("logger",None)
     K = numpy.random.randint(1000)
     enantio = kwargs.get("enantio",False)
-    if enantio and debug: print "do enantio"
     shifted = kwargs.get("shifted",True)
-    if shifted and debug: print "images are shifted"
-    do_center_image = kwargs.get("center_image",False)
-    if do_center_image and debug: print "centering image"
+    center_result = kwargs.get("center_result",None)
     pixels_to_exclude = kwargs.get("pixels_to_exclude",None)
     do_maximize_overlap = kwargs.get("maximize_overlap",True)
-    if do_maximize_overlap and debug: print "maximizing overlap"
     do_minimize_phase_ramp = kwargs.get("minimize_phase_ramp",False)
-    if do_minimize_phase_ramp and debug: print "minimizing phase ramp"
     do_phase_match = kwargs.get("real_space_phase_match",True)
-    if do_phase_match and debug: print "matching real space"
     do_align_com_support = kwargs.get("align_com_support",False)
-    if do_align_com_support and debug: print "aligning center of mass of support"
+
+    if logger != None:
+        s = "  "
+        if enantio: s += "Enantio, "
+        if shifted: s += "Shifted, "
+        if pixels_to_exclude != None: s += "%i pixels specified to exclude, " % pixel_to_exclude.sum()
+        if do_maximize_overlap: s += "Maximizing overlap, "
+        if do_minimize_phase_ramp: s += "Minimize phase ramp, "
+        if do_phase_match: s += "Phase match, "
+        if do_align_com_support: s += "Align center of mass of support, "
+        if center_result != None: s += "Center result: %s, " % center_result
+        logger.debug("PRTF runs with the folloing configuration: %s",s[:-2])
 
     if debug:
         os.system("rm %s/testdata/prtf*" % this_folder)
@@ -1179,7 +1189,7 @@ def prtf(imgs0,msks0,**kwargs):
             pylab.imsave(this_folder+"/testdata/prtf_%i_%i_I_%i.png" % (K,i,j),abs(img1),vmin=0.,vmax=3.)
             pylab.imsave(this_folder+"/testdata/prtf_%i_%i_IP_%i.png" % (K,i,j),numpy.angle(img1) % (2.*numpy.pi),vmin=0.,vmax=2.*numpy.pi)
             pylab.imsave(this_folder+"/testdata/prtf_%i_%i_A_M_%i.png" % (K,i,j),abs(msk1))
-            print "Power: %f" % (abs(img1).sum()/abs(img0).sum())
+            print "Power: %f" % (abs(img1).sum()/(abs(img0).sum()+numpy.finfo("float32").eps))
             print "Avg. phase: %f,%f" % ((msk0*numpy.angle(img1)).mean(),(msk0*numpy.angle(img0)).mean())
             print "Diff: %f" % (abs(img1-img0).mean()/abs(img0).mean())
         imgs1[i,:,:] = img1[:,:]
@@ -1207,16 +1217,21 @@ def prtf(imgs0,msks0,**kwargs):
         pylab.imsave(this_folder+"/testdata/superI%i.png" % numpy.random.randint(1000),abs(imgs1_super),vmin=0,vmax=2.)
         pylab.imsave(this_folder+"/testdata/superM%i.png" % numpy.random.randint(1000),abs(msks1_super),vmin=0,vmax=1.)
 
-    if do_center_image:
-        CM = center_of_mass(msks1_super)
-        imgs1_super = pixel_translation(imgs1_super,-CM,"nearest")
-        msks1_super = pixel_translation(msks1_super,-CM,"nearest")
+    if center_result != None:
+        if center_result == "image":
+            CM = center_od_mass(abs(imgs1_super))
+        elif center_result == "support_times_image":
+            CM = center_of_mass(msks1_super*abs(imgs1_super))
+        elif center_result == "support":
+            CM = center_of_mass(msks1_super)
+        imgs1_super = pixel_translation(imgs1_super,CM,"nearest")
+        msks1_super = pixel_translation(msks1_super,CM,"nearest")
 
     if do_align_com_support:
         com = center_of_mass(msks1_super)
         if com[0] > 0 and com[1] > 0:
             imgs1_super = fft_turn180(imgs1_super)
-            msks1_super = fft_turn180(msks1_super)
+            msks1_super = abs(fft_turn180(msks1_super))
 
     if shifted:
         imgs1_super = numpy.fft.fftshift(imgs1_super)
