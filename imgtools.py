@@ -1110,16 +1110,16 @@ def prtf(imgs0,msks0,**kwargs):
     do_align_com_support = kwargs.get("align_com_support",False)
 
     if logger != None:
-        s = ""
-        if enantio: s.append("Enantio")
-        if shifted: s.append("Shifted")
-        if pixel_to_exclude != None: s.append("%i pixels specified to exclude" % pixel_to_exclude.sum())
-        if do_maximize_overlap: s.append("Maximizing overlap")
-        if do_minimize_phase_ramp: s.append("Minimize phase ramp.")
-        if do_phase_match: s.append("Phase match")
-        if do_algn_support: s.append("Align support")
-        if center_result != None: s.append("Center result: %s" % center_result)
-        logger.debug("PRTF runs with the folloing configuration: %s",s)
+        s = "  "
+        if enantio: s += "Enantio, "
+        if shifted: s += "Shifted, "
+        if pixels_to_exclude != None: s += "%i pixels specified to exclude, " % pixel_to_exclude.sum()
+        if do_maximize_overlap: s += "Maximizing overlap, "
+        if do_minimize_phase_ramp: s += "Minimize phase ramp, "
+        if do_phase_match: s += "Phase match, "
+        if do_align_com_support: s += "Align center of mass of support, "
+        if center_result != None: s += "Center result: %s, " % center_result
+        logger.debug("PRTF runs with the folloing configuration: %s",s[:-2])
 
     if debug:
         os.system("rm %s/testdata/prtf*" % this_folder)
