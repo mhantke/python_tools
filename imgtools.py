@@ -1098,22 +1098,28 @@ def phase_match(imgA,imgB,weights=None): # typically weights = (abs(imgA)*abs(im
 
 def prtf(imgs0,msks0,**kwargs):
     debug = False
+    logger = kwargs.get("logger",None)
     K = numpy.random.randint(1000)
     enantio = kwargs.get("enantio",False)
-    if enantio and debug: print "do enantio"
     shifted = kwargs.get("shifted",True)
-    if shifted and debug: print "images are shifted"
-    do_center_image = kwargs.get("center_image",False)
-    if do_center_image and debug: print "centering image"
+    center_result = kwargs.get("center_result",None)
     pixels_to_exclude = kwargs.get("pixels_to_exclude",None)
     do_maximize_overlap = kwargs.get("maximize_overlap",True)
-    if do_maximize_overlap and debug: print "maximizing overlap"
     do_minimize_phase_ramp = kwargs.get("minimize_phase_ramp",False)
-    if do_minimize_phase_ramp and debug: print "minimizing phase ramp"
     do_phase_match = kwargs.get("real_space_phase_match",True)
-    if do_phase_match and debug: print "matching real space"
     do_align_com_support = kwargs.get("align_com_support",False)
-    if do_align_com_support and debug: print "aligning center of mass of support"
+
+    if logger != None:
+        s = ""
+        if enantio: s.append("Enantio")
+        if shifted: s.append("Shifted")
+        if pixel_to_exclude != None: s.append("%i pixels specified to exclude" % pixel_to_exclude.sum())
+        if do_maximize_overlap: s.append("Maximizing overlap")
+        if do_minimize_phase_ramp: s.append("Minimize phase ramp.")
+        if do_phase_match: s.append("Phase match")
+        if do_algn_support: s.append("Align support")
+        if center_result != None: s.append("Center result: %s" % center_result)
+        logger.debug("PRTF runs with the folloing configuration: %s",s)
 
     if debug:
         os.system("rm %s/testdata/prtf*" % this_folder)
@@ -1185,7 +1191,7 @@ def prtf(imgs0,msks0,**kwargs):
             pylab.imsave(this_folder+"/testdata/prtf_%i_%i_I_%i.png" % (K,i,j),abs(img1),vmin=0.,vmax=3.)
             pylab.imsave(this_folder+"/testdata/prtf_%i_%i_IP_%i.png" % (K,i,j),numpy.angle(img1) % (2.*numpy.pi),vmin=0.,vmax=2.*numpy.pi)
             pylab.imsave(this_folder+"/testdata/prtf_%i_%i_A_M_%i.png" % (K,i,j),abs(msk1))
-            print "Power: %f" % (abs(img1).sum()/abs(img0).sum())
+            print "Power: %f" % (abs(img1).sum()/(abs(img0).sum()+numpy.finfo("float32").eps))
             print "Avg. phase: %f,%f" % ((msk0*numpy.angle(img1)).mean(),(msk0*numpy.angle(img0)).mean())
             print "Diff: %f" % (abs(img1-img0).mean()/abs(img0).mean())
         imgs1[i,:,:] = img1[:,:]
@@ -1213,16 +1219,21 @@ def prtf(imgs0,msks0,**kwargs):
         pylab.imsave(this_folder+"/testdata/superI%i.png" % numpy.random.randint(1000),abs(imgs1_super),vmin=0,vmax=2.)
         pylab.imsave(this_folder+"/testdata/superM%i.png" % numpy.random.randint(1000),abs(msks1_super),vmin=0,vmax=1.)
 
-    if do_center_image:
-        CM = center_of_mass(msks1_super)
-        imgs1_super = pixel_translation(imgs1_super,-CM,"nearest")
-        msks1_super = pixel_translation(msks1_super,-CM,"nearest")
+    if center_result != None:
+        if center_result == "image":
+            CM = center_od_mass(abs(imgs1_super))
+        elif center_result == "support_times_image":
+            CM = center_of_mass(msks1_super*abs(imgs1_super))
+        elif center_result == "support":
+            CM = center_of_mass(msks1_super)
+        imgs1_super = pixel_translation(imgs1_super,CM,"nearest")
+        msks1_super = pixel_translation(msks1_super,CM,"nearest")
 
     if do_align_com_support:
         com = center_of_mass(msks1_super)
         if com[0] > 0 and com[1] > 0:
             imgs1_super = fft_turn180(imgs1_super)
-            msks1_super = fft_turn180(msks1_super)
+            msks1_super = abs(fft_turn180(msks1_super))
 
     if shifted:
         imgs1_super = numpy.fft.fftshift(imgs1_super)

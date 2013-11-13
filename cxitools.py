@@ -44,8 +44,8 @@ class CXIWriter:
             elif k != "i":
                 self.write_to_dataset(name,d[k],d.get("i",-1))
     def write_to_dataset(self,name,data,i):
-        #if self.logger != None:
-        #    self.logger.info("Write dataset %s of event %i." % (name,i))
+        if self.logger != None:
+            self.logger.debug("Write dataset %s of event %i." % (name,i))
         if name not in self.f:
             t0 = time.time()
             if isscalar(data):
@@ -67,7 +67,7 @@ class CXIWriter:
             self.f[name].attrs.modify("axes",axes)
             t1 = time.time()
             if self.logger != None:
-                self.logger.info("Create dataset %s within %.1f sec.",name,t1-t0)
+                self.logger.debug("Create dataset %s within %.1f sec.",name,t1-t0)
 
         if i == -1:
             if isscalar(data):
@@ -237,7 +237,7 @@ class CXIReader:
             else:
                 order.append(numpy.zeros(Nevents_fle))
                 if self.logger != None:
-                    self.logger.info("Set order of events in %s/%s",dty,fle)
+                    self.logger.debug("Set order of events in %s/%s",dty,fle)
                 f = h5py.File(dty+"/"+fle,"r")
                 sortdata = f[sorting_dsname]
                 order[i][:] = argsort(sortdata)[:]
@@ -251,18 +251,18 @@ class CXIReader:
         while True:
             if self.ievent_process == self.Nevents_process-1:
                 if self.logger != None:
-                    self.logger.info("Reached last event to process.")
+                    self.logger.debug("Reached last event to process.")
                 return False
             self.ievent_file += 1
             # return none if end of file list is reached
             if self.ifile >= self.Nfiles:
                 if self.logger != None:
-                    self.logger.info("Reached end of list of files.")
+                    self.logger.debug("Reached end of list of files.")
                 self.F.close()
                 return False
             if self.ievent_file >= self.Nevents_files[self.ifile]:
                 if self.logger != None:
-                    self.logger.info("Reached end of file (%i) %s/%s.",self.ifile,self.directories[self.ifile],self.filenames[self.ifile])
+                    self.logger.debug("Reached end of file (%i) %s/%s.",self.ifile,self.directories[self.ifile],self.filenames[self.ifile])
                 self.ifile += 1
                 self.ievent_file = -1
             if self.is_event_to_process[self.ifile][self.order[self.ifile][self.ievent_file]] == False:
@@ -278,10 +278,10 @@ class CXIReader:
         if self.ifile_opened != self.ifile:
             if self.ifile_opened != None:
                 if self.logger != None:
-                    self.logger.info("Closing file: %s/%s",self.directories[self.ifile_opened],self.filenames[self.ifile_opened])            
+                    self.logger.debug("Closing file: %s/%s",self.directories[self.ifile_opened],self.filenames[self.ifile_opened])            
                 self.F.close()
             if self.logger != None:
-                self.logger.info("Opening file: %s/%s",self.directories[self.ifile],self.filenames[self.ifile])
+                self.logger.debug("Opening file: %s/%s",self.directories[self.ifile],self.filenames[self.ifile])
             self.F = h5py.File(self.directories[self.ifile]+'/'+self.filenames[self.ifile],'r')
             self.ifile_opened = self.ifile
         
@@ -291,9 +291,11 @@ class CXIReader:
         D["i"] = self.ievent_process
         if dsnames_stack != None:
             for (key,dsname) in dsnames_stack.items():
+                self.logger.debug(dsname)
                 D[key] = self.F[dsname][self.order[self.ifile][self.ievent_file]].copy()
         if dsnames_single != None:
             for (key,dsname) in dsnames_single.items():
+                self.logger.debug(dsname)
                 D[key] = self.F[dsname][:].copy()
         return D
 
