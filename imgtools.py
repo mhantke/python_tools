@@ -742,10 +742,10 @@ def radial_mean_fast(image,**kwargs):
 #        I_recentered[:,:] = I[:,:]
 #    return I_recentered
 
-def recenter(I,cx,cy,interpolation="linear"):
+def recenter(I,cx,cy,order=1):
     dx = int(pylab.ceil(cx-(I.shape[1]-1)/2.))
     dy = int(pylab.ceil(cy-(I.shape[0]-1)/2.))
-    return pixel_translation(I,[dy,dx],interpolation)
+    return pixel_translation(I,[dy,dx],order)
 
 def downsample_position(position,downsampling):
     return (position-(downsampling-1)/2.)/(1.*downsampling)
@@ -862,31 +862,44 @@ def phase_diff(imgA,imgB):
 
 
 # should be done with stsci.image package in the future
-def pixel_translation(A,t,method="linear",fill_value=0):
-    from scipy.interpolate import griddata
-    d = len(list(A.shape))
-    g = numpy.indices(A.shape)
-    gt = numpy.indices(A.shape)
-    gt = list(gt)
-    g = list(g)
-    for i in range(d):
-        gt[i] = ((gt[i]+t[i]) % A.shape[i])
-        g[i] = g[i].flatten()
-    gt = tuple(gt)
-    g = tuple(g)
-    return griddata(g,A.flatten(),gt,method=method,fill_value=fill_value)
+#def pixel_translation(A,t,method="linear",fill_value=0):
+#    from scipy.interpolate import griddata
+#    d = len(list(A.shape))
+#    g = numpy.indices(A.shape)
+#    gt = numpy.indices(A.shape)
+#    gt = list(gt)
+#    g = list(g)
+#    for i in range(d):
+#        gt[i] = ((gt[i]+t[i]) % A.shape[i])
+#        g[i] = g[i].flatten()
+#    gt = tuple(gt)
+#    g = tuple(g)
+#    return griddata(g,A.flatten(),gt,method=method,fill_value=fill_value)
 
-# should be done with stsci.image package in the future
-def upsample(A,f,order=1):
-    from scipy.interpolate import griddata
-    #from scipy.interpolate import interp2d
+def pixel_translation(A,t,order=1):
+    if A.dtype == "complex64":
+        return (1.*pixel_translation(A.real,t,order)+1.j*pixel_translation(A.imag,t,order))
     from scipy import ndimage
     d = len(list(A.shape))
     g = numpy.indices(A.shape)
-    new_shape = tuple((numpy.array(A.shape)*f).round())
+    gt = numpy.indices(A.shape)
+    for i in range(d):
+        gt[i] = (gt[i]+t[i]) % A.shape[i]
+    return ndimage.map_coordinates(A, gt, order=order)
+
+
+# should be done with stsci.image package in the future
+def upsample(A,f0,order=1):
+    if A.dtype == "complex64":
+        return (1.*upsample(A.real,f,order)+1.j*upsample(A.imag,f,order))
+    from scipy import ndimage
+    d = len(list(A.shape))
+    g = numpy.indices(A.shape)
+    new_shape = tuple((numpy.array(A.shape)*f0).round())
     gt = numpy.float64(numpy.indices(new_shape))
     for i in range(d):
-        gt[i] = (gt[i]/(1.*f))
+        f = (new_shape[i]-1)/float(A.shape[i]-1)
+        gt[i] = gt[i]/f
     return ndimage.map_coordinates(A, gt, order=order)
 
 
@@ -1219,13 +1232,13 @@ def prtf(imgs0,msks0,**kwargs):
 
     if center_result != None:
         if center_result == "image":
-            CM = center_od_mass(abs(imgs1_super))
+            CM = center_of_mass(abs(imgs1_super))
         elif center_result == "support_times_image":
             CM = center_of_mass(msks1_super*abs(imgs1_super))
         elif center_result == "support":
             CM = center_of_mass(msks1_super)
-        imgs1_super = pixel_translation(imgs1_super,CM,"cubic")
-        msks1_super = pixel_translation(msks1_super,CM,"cubic")
+        imgs1_super = pixel_translation(imgs1_super,CM,3)
+        msks1_super = pixel_translation(msks1_super,CM,3)
 
     if do_align_com_support:
         com = center_of_mass(msks1_super)
