@@ -1226,8 +1226,8 @@ def prtf(imgs0,msks0,**kwargs):
             CM = center_of_mass(msks1_super*abs(imgs1_super))
         elif center_result == "support":
             CM = center_of_mass(msks1_super)
-        imgs1_super = pixel_translation(imgs1_super,CM,"nearest")
-        msks1_super = pixel_translation(msks1_super,CM,"nearest")
+        imgs1_super = pixel_translation(imgs1_super,CM,"cubic")
+        msks1_super = pixel_translation(msks1_super,CM,"cubic")
 
     if do_align_com_support:
         com = center_of_mass(msks1_super)
