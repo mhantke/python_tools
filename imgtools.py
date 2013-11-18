@@ -1418,3 +1418,7 @@ def array_to_array(A1,A2,p0=None,origin="corner",mode="sum",fill_value=0.):
         A2_new[p_min[0]:p_max[0],p_min[1]:p_max[1],p_min[2]:p_max[2]] = f(A2_new[p_min[0]:p_max[0],p_min[1]:p_max[1],p_min[2]:p_max[2]],A1[:,:,:])
     return A2_new
         
+def get_outline_pixels(M):
+    import scipy.signal
+    K = numpy.ones(shape=(3,3),dtype="int16")
+    return (scipy.signal.convolve2d(M,K,mode='same',boundary='fill') != 0) * (M == 0)
