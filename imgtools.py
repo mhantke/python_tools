@@ -6,6 +6,8 @@
 # Email: maxhantke@gmail.com
 
 import os,re,sys,h5py,pylab,numpy,time,cmath
+import logging
+logger = logging.getLogger("imgtools")
 import cxitools
 
 this_folder = os.path.dirname(__file__)
@@ -894,7 +896,6 @@ def upsample(A,f0,order=1):
         return (1.*upsample(A.real,f,order)+1.j*upsample(A.imag,f,order))
     from scipy import ndimage
     d = len(list(A.shape))
-    g = numpy.indices(A.shape)
     new_shape = tuple((numpy.array(A.shape)*f0).round())
     gt = numpy.float64(numpy.indices(new_shape))
     for i in range(d):
@@ -1109,7 +1110,7 @@ def phase_match(imgA,imgB,weights=None): # typically weights = (abs(imgA)*abs(im
 
 def prtf(imgs0,msks0,**kwargs):
     debug = False
-    logger = kwargs.get("logger",None)
+    logger0 = kwargs.get("logger",None)
     K = numpy.random.randint(1000)
     enantio = kwargs.get("enantio",False)
     shifted = kwargs.get("shifted",True)
@@ -1120,7 +1121,7 @@ def prtf(imgs0,msks0,**kwargs):
     do_phase_match = kwargs.get("real_space_phase_match",True)
     do_align_com_support = kwargs.get("align_com_support",False)
 
-    if logger != None:
+    if logger0 != None:
         s = "  "
         if enantio: s += "Enantio, "
         if shifted: s += "Shifted, "
@@ -1130,7 +1131,7 @@ def prtf(imgs0,msks0,**kwargs):
         if do_phase_match: s += "Phase match, "
         if do_align_com_support: s += "Align center of mass of support, "
         if center_result != None: s += "Center result: %s, " % center_result
-        logger.debug("PRTF runs with the folloing configuration: %s",s[:-2])
+        logger0.debug("PRTF runs with the folloing configuration: %s",s[:-2])
 
     if debug:
         os.system("rm %s/testdata/prtf*" % this_folder)
@@ -1373,3 +1374,47 @@ def half_pixel_downsampling(img0,msk0,downsampling=2,mode="conservative",cx=None
     return [imgXxX0,mskXxX0,imgXxX1,mskXxX1]
 
 
+def array_to_array(A1,A2,p0=None,origin="corner",mode="sum",fill_value=0.):
+    N1 = numpy.array(A1.shape)
+    N2 = numpy.array(A2.shape)
+    d = len(N1)
+    if d > 3:
+        logger.error("Cannot handle more than 3 dimensional data.")
+        return
+    if p0 == None:
+        p1 = numpy.zeros(d)
+    else:
+        p1 = p0
+    if origin == "corner":
+        p = p1
+    elif origin == "middle":
+        p = p1+(N2-1)/2.
+    else:
+        p = p1+origin
+    p_min = numpy.int16((p-N1/2).round())
+    p_max = p_min + N1
+    print p_min,p_max
+    A2_new = A2.copy()
+    N2_new = N2.copy()
+    origin_offset = numpy.zeros(d)
+    for di in range(d):
+        if p_min[di] < 0:
+            offset = -p_min[di]
+            N2_new[di] += offset
+            p_min[di] += offset
+            p_max[di] += offset
+        if p_max[di] >= N2[di]:
+            N2_new[di] = p_max[di]+1
+    A2_new = numpy.zeros(shape=tuple(N2_new),dtype=A2.dtype) + fill_value
+    print p_min,p_max
+    if mode == "sum": f = lambda a,b: a+b
+    elif mode == "replace": f = lambda a,b: b
+    else: logger.error("%s is not a valid mode." % mode)
+    if d == 1:
+        A2_new[p_min[0]:p_max[0]] = f(A2_new[p_min[0]:p_max[0]],A1[:])
+    elif d == 2:
+        A2_new[p_min[0]:p_max[0],p_min[1]:p_max[1]] = f(A2_new[p_min[0]:p_max[0],p_min[1]:p_max[1]],A1[:,:])
+    elif d == 3:
+        A2_new[p_min[0]:p_max[0],p_min[1]:p_max[1],p_min[2]:p_max[2]] = f(A2_new[p_min[0]:p_max[0],p_min[1]:p_max[1],p_min[2]:p_max[2]],A1[:,:,:])
+    return A2_new
+        

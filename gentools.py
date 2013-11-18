@@ -5,7 +5,8 @@
 # Author: Max Hantke
 # Email: maxhantke@gmail.com
 
-import numpy,pylab,os,re,csv,string,time,datetime
+import numpy,pylab,os,re,csv,string,time,datetime,logging
+logger = logging.getLogger("pythontools")
 
 # in_filter can be a string or a list of strings
 def get_filenames(in_filter=None,path="./"):
@@ -337,56 +338,53 @@ def imsave(fname, arr, **kwargs):
 def dict_to_dict(dict_src,dict_dest):
     for k in dict_src.keys():
         dict_dest[k] = dict_src[k]
+        
+def read_configfile(configfile):
+    import ConfigParser
+    config = ConfigParser.ConfigParser()
+    f = open(configfile,"r")
+    config.readfp(f)
+    confDict = {}
+    for section in config.sections(): 
+        c = confDict[section] = dict(config.items(section))
+        for key in c.keys(): 
+            c[key] = estimate_type(c[key])
+            if isinstance(c[key],str):
+                if '$' in c[key]:
+                    c[key] = os.path.expandvars(c[key])
+                if " " in c[key]:
+                    c[key] = c[key].split()
+                    for i in range(len(c[key])):
+                        c[key][i] = estimate_type(c[key][i])
+    f.close()
+    return confDict
 
 class Configuration:
     def __init__(self,config={},default={},verbose=False):
         self.verbose = verbose
         
         if isinstance(config,str):
-            self.read_configfile(config)
+            self.confDict = read_configfile(config)
             self.configfile = config
         else:
             self.confDict = config
         
         if isinstance(default,str):
-            defDict = Configuration(default).confDict
+            defDict = read_configfile(default)
         else:
             defDict = default
         self.set_unspecified_to_default(defDict)
-
-    def read_configfile(self,configfile):
-        import ConfigParser
-        config = ConfigParser.ConfigParser()
-        f = open(configfile)
-        config.readfp(f)
-        self.confDict = {}
-        for section in config.sections(): 
-            c = self.confDict[section] = dict(config.items(section))
-            for key in c.keys(): 
-                c[key] = estimate_type(c[key])
-                if isinstance(c[key],str):
-                    if '$' in c[key]:
-                        c[key] = os.path.expandvars(c[key])
-                    if " " in c[key]:
-                        c[key] = c[key].split()
-                        for i in range(len(c[key])):
-                            c[key][i] = estimate_type(c[key][i])
-        f.close()
     
     def set_unspecified_to_default(self,defaultDict):
         for section in defaultDict.keys():
             if section not in self.confDict.keys():
                 self.confDict[section] = {}
-                if self.verbose:
-                    print "Add section %s to configuration as it did not exist." % section
+                logger.info("Add section %s to configuration as it did not exist." % section)
             for variableName in defaultDict[section].keys():
                 if variableName not in self.confDict[section].keys():
                     self.confDict[section][variableName] = defaultDict[section][variableName]
-                    if self.verbose:
-                        print "Add variable %s with default value %s to configuration section %s as variable did not exist." % (variableName,str(defaultDict[section][variableName]),section)
-    
+                    logger.info("Add variable %s with default value %s to configuration section %s as variable did not exist." % (variableName,str(defaultDict[section][variableName]),section))
               
-      
 def mkdir_timestamped(dirname):
     ts = time.time()
     time_string = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d_%H%M%S')

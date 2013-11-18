@@ -100,6 +100,21 @@ cdict_redblue = {'red':   [(0.00,0.0,0.0),
 
 cmaps["redblue"] = matplotlib.colors.LinearSegmentedColormap('redblue', cdict_redblue, 1024)
 
+cdict_grayalpha = {'red':   [(0.0,0.0,0.0),
+                             (1.0,0.0,0.0)],
+                   
+                   'green':  [(0.0,0.0,0.0),
+                              (1.0,0.0,0.0)],
+                   
+                   'blue':  [(0.0,0.0,0.0),
+                             (1.0,0.0,0.0)],
+                   
+                   'alpha': [(0.0,0.0,0.0),
+                             (1.0,1.0,1.0)]}
+
+cmaps["grayalpha"] = matplotlib.colors.LinearSegmentedColormap('grayalpha', cdict_grayalpha, 1024)
+
+
 
 
 def make_colorbar(filename,Nx,Ny,colormap=cm.jet,orientation="vertical"):

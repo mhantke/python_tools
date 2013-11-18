@@ -289,6 +289,8 @@ class CXIReader:
         self._open_file()
         D = {}
         D["i"] = self.ievent_process
+        D["filename"] = self.filenames[self.ifile_opened]
+        D["filename_i"] = self.ifile_opened
         if dsnames_stack != None:
             for (key,dsname) in dsnames_stack.items():
                 self.logger.debug(dsname)
