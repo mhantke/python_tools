@@ -291,6 +291,21 @@ def gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
         
     return [p_result, yest]
 
+def bootstrap_gaussian_fit(xdata,ydata,p_init=None,show=False,Nfract=0.5,n=100):
+    ps = []
+    N = round(len(xdata)*Nfract)
+    for i in range(n):
+        random_pick = numpy.random.randint(0,N,(N,))
+        xdata1 = xdata[random_pick]
+        ydata1 = ydata[random_pick]
+        ps.append(gaussian_fit(xdata1,ydata2,p_init,show)[0])
+    ps = numpy.array(ps)
+    p_result = ps.mean(0)
+    p_std = ps.std(0)
+    yest = gaussian(xdata,p_result[0], p_result[1], p_result[2])
+    return [p_result, yest, p_std]
+            
+
 
 def my_imsave(fname, arr, **kwargs): imsave(fname, arr, **kwargs)
 
