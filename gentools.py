@@ -291,14 +291,20 @@ def gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
         
     return [p_result, yest]
 
-def bootstrap_gaussian_fit(xdata,ydata,p_init=None,show=False,Nfract=0.5,n=100):
+def bootstrap_gaussian_fit(xdata,ydata,p_init0=None,show=False,Nfract=0.5,n=100):
+    if p_init0 == None:
+        p_init = gaussian_fit(xdata,ydata)[0]
+    else:
+        p_init = p_init0
     ps = []
     N = round(len(xdata)*Nfract)
     for i in range(n):
         random_pick = numpy.random.randint(0,N,(N,))
         xdata1 = xdata[random_pick]
         ydata1 = ydata[random_pick]
-        ps.append(gaussian_fit(xdata1,ydata2,p_init,show)[0])
+        variation = 0.5
+        p0 = numpy.array(p_init) * (1+((-0.5+numpy.random.rand(len(p_init)))*variation))
+        ps.append(gaussian_fit(xdata1,ydata1,tuple(p0),show)[0])
     ps = numpy.array(ps)
     p_result = ps.mean(0)
     p_std = ps.std(0)
