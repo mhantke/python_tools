@@ -198,46 +198,88 @@ def gaussian_sharpening(image,sigma):
     imagefourier *= (1.0-gauss)
     return pylab.ifft2(imagefourier)
     
-def downsample(array2d_raw,factor,mode="pick"):
-    array2d = pylab.array(array2d_raw,dtype=array2d_raw.dtype)
-    factor = int(factor)
-    if factor == 1:
-        return array2d
+def downsample(array2d0,factor0,mode="pick",mask2d0=None,bad_bits=None):
     available_modes = ["pick","integrate"]#,"interpolate"]
     if not mode in available_modes:
         print "ERROR: %s is not a valid mode." % mode
-        return 0
-    Ny = array2d.shape[0]
+        return
+    factor = int(round(factor0))
+    if factor == 1:
+        if mask2d0 == None:
+            return array2d0
+        else:
+            return [array2d0,mask2d0]
+    array2d = numpy.array(array2d0,dtype=array2d0.dtype)
+    if mask2d0 == None:
+        mask2d = None
+    else:
+        mask2d = numpy.array(mask2d0,dtype="int16")
     Nx = array2d.shape[1]
+    Ny = array2d.shape[0]
     if mode == "pick": 
-        Ny_new = int(pylab.ceil(1.0*Ny/factor))
-        Nx_new = int(pylab.ceil(1.0*Nx/factor))  
-        array2d_new = pylab.zeros(Nx_new*Ny_new,dtype=array2d.dtype)  
-        array2d_flat = array2d.flatten()
-        for i in pylab.arange(0,Nx_new*Ny_new,1):
-            ind = i%Nx_new*factor+(i/Nx_new)*Nx*factor
-            array2d_new[i] = array2d_flat[ind]
-        return pylab.reshape(array2d_new,(Ny_new,Nx_new))
-    elif mode == "integrate":
-        Ny_new = int(pylab.ceil(1.0*Ny/factor))
-        Nx_new = int(pylab.ceil(1.0*Nx/factor))  
-        array2d_new = pylab.zeros(shape=(Ny_new,Nx_new),dtype=array2d.dtype)
-        for y_new in pylab.arange(0,Ny_new,1):
-            for x_new in pylab.arange(0,Nx_new,1):
-                y_min = y_new*factor
-                y_max = (y_new+1)*factor
-                x_min = x_new*factor
-                x_max = (x_new+1)*factor
-                if y_max < Ny and x_max < Nx:
-                    array2d_new[y_new,x_new] = array2d[y_min:y_max,x_min:x_max].mean()
-                else:
-                    if y_max >= Ny and x_max >= Nx:
-                        array2d_new[y_new,x_new] = array2d[y_min:,x_min:].mean()
-                    elif y_max >= Ny:
-                        array2d_new[y_new,x_new] = array2d[y_min:,x_min:x_max].mean()
-                    elif x_max >= Nx:
-                        array2d_new[y_new,x_new] = array2d[y_min:y_max,x_min:].mean()
-        return array2d_new
+        Y,X = numpy.indices(array2d0.shape)
+        pick = (Y%factor)*(X%factor)
+        Ny_new = pick[:,0].sum()
+        Nx_new = pick[0,:].sum()
+        array2d_new = (array2d.flatten()[pick.flatten()==0]).reshape((Ny_new,Nx_new))
+        if mask != None:
+            mask2d_new = (mask2d.flatten()[pick.flatten()==0]).reshape((Ny_new,Nx_new))
+            return [array2d_new,mask2d_new]
+        else:
+            return array2d_new
+    # SLOW
+    #elif mode == "integrate": # non-conservative if mask is given
+    #    Ny_new = int(pylab.ceil(1.0*Ny/factor))
+    #    Nx_new = int(pylab.ceil(1.0*Nx/factor))  
+    #    array2d_new = pylab.zeros(shape=(Ny_new,Nx_new),dtype=array2d.dtype)
+    #    for y_new in pylab.arange(0,Ny_new,1):
+    #        for x_new in pylab.arange(0,Nx_new,1):
+    #            y_min = y_new*factor
+    #            y_max = (y_new+1)*factor
+    #            x_min = x_new*factor
+    #            x_max = (x_new+1)*factor
+    #            if y_max < Ny and x_max < Nx:
+    #                array2d_new[y_new,x_new] = array2d[y_min:y_max,x_min:x_max].mean()
+    #            else:
+    #                if y_max >= Ny and x_max >= Nx:
+    #                    array2d_new[y_new,x_new] = array2d[y_min:,x_min:].mean()
+    #                elif y_max >= Ny:
+    #                    array2d_new[y_new,x_new] = array2d[y_min:,x_min:x_max].mean()
+    #                elif x_max >= Nx:
+    #                    array2d_new[y_new,x_new] = array2d[y_min:y_max,x_min:].mean()
+    #    return array2d_new
+    elif mode == "integrate": # non-conservative if mask is given
+        Nx_new = int(numpy.ceil(Nx/factor))
+        Ny_new = int(numpy.ceil(Ny/factor))
+        Nx = Nx_new * factor
+        Ny = Ny_new * factor
+        A = zeros(shape=(Ny,Nx),dtype=array2d.dtype)
+        A[:array2d.shape[0],:array2d.shape[1]] = array2d[:,:]
+        A = A.flat
+        Y,X = numpy.indices((Ny,Nx))
+        Y = Y.flatten()
+        X = X.flatten()
+        Y /= factor
+        X /= factor
+        superp = Y*Nx_new+X
+        superp_order = superp.argsort()
+        A = A[superp_order]
+        A = A.reshape((Nx_new*Ny_new,factor))
+        if mask2d == None:
+            B = A.sum(1)
+            return B.reshape((Ny_new,Nx_new))
+        if mask2d != None:
+            AM = zeros(shape=(Ny,Nx),dtype="int16")
+            AM[:mask2d.shape[0],mask2d.shape[1]] = mask2d[:,:]
+            AM = AM.flat
+            if bad_bits == None:
+                BN = AM.sum(1)
+            else:
+                BN = ((AM | bad_bits) == 0).sum(1)
+            BM = BN != 0
+            B = (A*AM).sum(1)
+            B[BM] = B[BM] * factor/numpy.float64(BN[BM])
+            return [B.reshape((Ny_new,Nx_new)),BM.reshape((Ny_new,Nx_new))]
     elif mode == "interpolate":
         Ny_new = int(pylab.floor(1.0*Ny/factor))
         Nx_new = int(pylab.floor(1.0*Nx/factor))
