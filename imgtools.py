@@ -1445,3 +1445,12 @@ def get_outline_pixels(M):
     import scipy.signal
     K = numpy.ones(shape=(3,3),dtype="int16")
     return (scipy.signal.convolve2d(M,K,mode='same',boundary='fill') != 0) * (M == 0)
+
+def extend_mask_blurry(M,N):
+    import scipy.signal
+    Y,X = numpy.indices((N*2+1,N*2+1))
+    Y -= N/2
+    X -= N/2
+    K = numpy.array((numpy.sqrt(X**2+Y**2)<=N),dtype="float")
+    K /= K.sum()
+    return scipy.signal.convolve2d(M,K,mode='same',boundary='fill')
