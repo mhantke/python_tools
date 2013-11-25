@@ -198,7 +198,7 @@ def gaussian_sharpening(image,sigma):
     imagefourier *= (1.0-gauss)
     return pylab.ifft2(imagefourier)
     
-def downsample(array2d0,factor0,mode="pick",mask2d0=None,bad_bits=None):
+def downsample(array2d0,factor0,mode="pick",mask2d0=None,bad_bits=None,min_N_pixels=1):
     available_modes = ["pick","integrate"]#,"interpolate"]
     if not mode in available_modes:
         print "ERROR: %s is not a valid mode." % mode
@@ -258,17 +258,17 @@ def downsample(array2d0,factor0,mode="pick",mask2d0=None,bad_bits=None):
             AM = AM[superp_order]
             AM = AM.reshape((Nx_new*Ny_new,factor*factor))
             if bad_bits == None:
+                B = (A*AM).sum(1)
                 BN = AM.sum(1)
                 BM = BN != 0
-                B = (A*AM).sum(1)
             else:
+                B = (A*((AM & bad_bits) == 0)).sum(1)
                 BN = ((AM & bad_bits) == 0).sum(1)
                 BM = AM[:,0]
-                for i in range(1,factor):
+                for i in range(1,factor*factor):
                     BM |= AM[:,i]
-                BM[BN != 0] = BM[BN != 0] & ~bad_bits
-                B = (A*((AM & bad_bits) == 0)).sum(1)
-            B[BN != 0] = B[BN != 0] * factor/numpy.float64(BN[BN != 0])
+                BM[BN >= min_N_pixels] = BM[BN >= min_N_pixels] & ~bad_bits
+            B[BN >= min_N_pixels] = B[BN >= min_N_pixels] * factor/numpy.float64(BN[BN >= min_N_pixels])
             return [B.reshape((Ny_new,Nx_new)),BM.reshape((Ny_new,Nx_new))]
 
 

@@ -249,7 +249,7 @@ class CXIReader:
     def _next(self):
         # skip events that shall not be processed
         while True:
-            if self.ievent_process == self.Nevents_process-1:
+            if self.ievent_process == self.Nevents_process:
                 if self.logger != None:
                     self.logger.debug("Reached last event to process.")
                 return False
