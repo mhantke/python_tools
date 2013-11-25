@@ -27,7 +27,7 @@ def multiprocess(Nprocesses,Njobs,worker,getwork,logres=None,logger=None):
                                                args=(worker,pipes_end_worker[i],) )
         processes[i].start()
         if logger != None:
-            logger.info("Process %i started",i)
+            logger.debug("Process %i started",i)
 
     Njobs_done = 0
     Njobs_started = 0
@@ -37,7 +37,7 @@ def multiprocess(Nprocesses,Njobs,worker,getwork,logres=None,logger=None):
         pipes_end_host[i].send(getwork())
         Njobs_started+=1
         if logger != None:
-            logger.info("Initial job for process %i sent",i)
+            logger.debug("Initial job for process %i sent",i)
 
     t_start = time.time()
 
