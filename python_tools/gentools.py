@@ -5,7 +5,7 @@
 # Author: Max Hantke
 # Email: maxhantke@gmail.com
 
-import numpy,pylab,os,re,csv,string,time,datetime,logging
+import numpy,os,re,csv,string,time,datetime,logging
 logger = logging.getLogger("pythontools")
 
 # in_filter can be a string or a list of strings
@@ -48,7 +48,7 @@ def estimate_type(var):
 def png_mask_to_h5(filename,Nx,Ny):
     import Image,spimage
     I = Image.open(filename)
-    D = pylab.array(I.getdata())[:,0]
+    D = numpy.array(I.getdata())[:,0]
     D=D.reshape((Nx,Ny))
     img = spimage.sp_image_alloc(Nx,Ny,1)
     img.mask[:,:] = D[:,:]/255
@@ -58,7 +58,7 @@ def png_mask_to_h5(filename,Nx,Ny):
 def get_png_mask(filename):
     import Image
     I = Image.open(filename)
-    D = pylab.array(I.getdata())[:,0]
+    D = numpy.array(I.getdata())[:,0]
     D = D.reshape((I.size[1],I.size[0]))
     return D[:,:]/255.
 
@@ -137,16 +137,16 @@ def smoothListGaussian(list,strippedXs=False,degree=5):
     return smoothed 
 
 def smoothGaussian(array,sigma):
-    return pylab.ifft(pylab.fft(array)*1/pylab.sqrt(2*pylab.pi)/sigma*pylab.exp(pylab.arange(0,len(array),1.0)**2/2.0/sigma**2))
+    return numpy.ifft(numpy.fft(array)*1/numpy.sqrt(2*numpy.pi)/sigma*numpy.exp(numpy.arange(0,len(array),1.0)**2/2.0/sigma**2))
 
 def smoothGaussian1dMirror(array,sigma):
     array_reversed = list(array.copy())
     array_reversed.reverse()
-    array_reversed = pylab.array(array_reversed)
-    array_mirrored = pylab.zeros(2*len(array))
+    array_reversed = numpy.array(array_reversed)
+    array_mirrored = numpy.zeros(2*len(array))
     array_mirrored[:len(array)] = array[:]
     array_mirrored[len(array):] = array_reversed[:]
-    array_smoothed = pylab.ifft(pylab.fft(array_mirrored)*1/pylab.sqrt(2*pylab.pi)/sigma*pylab.exp(pylab.arange(0,len(array_mirrored),1.0)**2/2.0/sigma**2) )
+    array_smoothed = numpy.ifft(numpy.fft(array_mirrored)*1/numpy.sqrt(2*numpy.pi)/sigma*numpy.exp(numpy.arange(0,len(array_mirrored),1.0)**2/2.0/sigma**2) )
     array_smoothed = array_smoothed[:len(array)]
     print array_smoothed
     return array_smoothed
@@ -207,7 +207,7 @@ def smooth(x,window_len=11,window='hanning'):
     y=numpy.convolve(w/w.sum(),s,mode='same')
     return y[window_len:-window_len+1] 
 
-gaussian = lambda x,A0,x0,sigma: A0*pylab.exp((-(x-x0)**2)/(2.*sigma**2))
+gaussian = lambda x,A0,x0,sigma: A0*numpy.exp((-(x-x0)**2)/(2.*sigma**2))
 double_gaussian = lambda x,p1,p2: gaussian(x,p1[0],p1[1],p1[2])+gaussian(x,p2[0],p2[1],p2[2])
 
 def double_gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
@@ -218,7 +218,7 @@ def double_gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
         A01,A02 = 7.5,10.4
         mean1, mean2 = -5, 4.
         std1, std2 = 7.5, 4. 
-        xdata =  pylab.linspace(-20, 20, 500)
+        xdata =  numpy.linspace(-20, 20, 500)
         ydata = double_gaussian(xdata,[A01,mean1,std1],[A02,mean2,std2])
 
     if p_init == None:
@@ -240,6 +240,7 @@ def double_gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
     yest = double_gaussian(xdata,p_result[0],p_result[1])
 
     if show:
+        import pylab
         pylab.figure()
         yinit = double_gaussian(xdata,[p_A01,p_mean1,p_sd1],[p_A02,p_mean2,p_sd2])
         yest1 = gaussian(xdata,plsq[0][0],plsq[0][1],plsq[0][2])
@@ -262,7 +263,7 @@ def gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
         A0_test = 5.5
         x0_test = -2.
         s_test = 1. 
-        xdata =  pylab.linspace(-20., 20., 500)
+        xdata =  numpy.linspace(-20., 20., 500)
         ydata = gaussian(xdata,A0_test,x0_test,s_test)
 
     if p_init == None:
@@ -281,6 +282,7 @@ def gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
     yest = gaussian(xdata,A0_result, x0_result, s_result)
 
     if show:
+        import pylab
         pylab.figure()
         yinit = gaussian(xdata,A0_init, x0_init, s_init)
         pylab.plot(xdata, ydata, 'r.',color='red', label='Data')
@@ -322,6 +324,7 @@ def imsave(fname, arr, **kwargs):
     from matplotlib.colors import ColorConverter as CC
     C = CC()
     
+    import pylab
     if pylab.isinteractive():
         i_was_on = True
         pylab.ioff()
@@ -334,7 +337,7 @@ def imsave(fname, arr, **kwargs):
     if 'background' in kwargs.keys():
         if kwargs['background'] != 'transparent':
             [r,g,b] = C.to_rgb(kwargs['background'])
-            BG = pylab.ones(shape=(arr.shape[0],arr.shape[1],3))
+            BG = numpy.ones(shape=(arr.shape[0],arr.shape[1],3))
             BG[:,:,0] = r
             BG[:,:,1] = g
             BG[:,:,2] = b
