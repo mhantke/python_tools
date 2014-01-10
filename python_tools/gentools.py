@@ -408,7 +408,20 @@ class Configuration:
                 if variableName not in self.confDict[section].keys():
                     self.confDict[section][variableName] = defaultDict[section][variableName]
                     logger.info("Add variable %s with default value %s to configuration section %s as variable did not exist." % (variableName,str(defaultDict[section][variableName]),section))
-              
+
+    def save_to_file(self,filename):
+        ls = ["# Configuration file\n From configuration instance\n\n"]
+        for section_name,section in self.confDict.items():
+            if isinstance(section,dict):
+                ls.append("[%s]\n" % section_name)
+                for variable_name,variable in section.items():
+                    ls.append("%s=%s\n"+str(variable))
+                ls.append("\n")
+        s = open(filename,"w")
+        s.writelines(ls)
+        s.close()
+
+
 def mkdir_timestamped(dirname):
     ts = time.time()
     time_string = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d_%H%M%S')
