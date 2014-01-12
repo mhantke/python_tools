@@ -409,13 +409,13 @@ class Configuration:
                     self.confDict[section][variableName] = defaultDict[section][variableName]
                     logger.info("Add variable %s with default value %s to configuration section %s as variable did not exist." % (variableName,str(defaultDict[section][variableName]),section))
 
-    def save_to_file(self,filename):
-        ls = ["# Configuration file\n From configuration instance\n\n"]
+    def write_to_file(self,filename):
+        ls = ["# Configuration file\n# Automatically written by Configuration instance\n\n"]
         for section_name,section in self.confDict.items():
             if isinstance(section,dict):
                 ls.append("[%s]\n" % section_name)
                 for variable_name,variable in section.items():
-                    ls.append("%s=%s\n"+str(variable))
+                    ls.append("%s=%s\n" % (variable_name,str(variable)))
                 ls.append("\n")
         s = open(filename,"w")
         s.writelines(ls)
