@@ -70,13 +70,6 @@ def get_png_mask(filename):
     D = numpy.int16(D)
     return D
 
-def get_png_mask(filename):
-    import Image
-    I = Image.open(filename)
-    D = numpy.array(I.getdata())[:,0]
-    D = D.reshape((I.size[1],I.size[0]))
-    return D[:,:]/255.
-
 def save_to_csv(filename,list_of_arrays,list_of_array_names=[]):
     """Save given array values to a new csv file."""
     f = open(filename, 'wb')
