@@ -45,15 +45,30 @@ def estimate_type(var):
         except ValueError:
             raise NameError('Something messed up autocasting var %s (%s)' % (var, type(var)))
 
-def png_mask_to_h5(filename,Nx,Ny):
-    import Image,spimage
+#def png_mask_to_h5(filename,Nx,Ny):
+#    import Image,spimage
+#    I = Image.open(filename)
+#    D = numpy.array(I.getdata())[:,0]
+#    D=D.reshape((Nx,Ny))
+#    img = spimage.sp_image_alloc(Nx,Ny,1)
+#    img.mask[:,:] = D[:,:]/255
+#    spimage.sp_image_write(img,filename[:-4]+'.h5',0)
+#    spimage.sp_image_free(img)
+
+def get_png_mask(filename):
+    try: 
+        from pillow import Image
+    except:
+        import Image
     I = Image.open(filename)
-    D = numpy.array(I.getdata())[:,0]
-    D=D.reshape((Nx,Ny))
-    img = spimage.sp_image_alloc(Nx,Ny,1)
-    img.mask[:,:] = D[:,:]/255
-    spimage.sp_image_write(img,filename[:-4]+'.h5',0)
-    spimage.sp_image_free(img)
+    D = numpy.array(I.getdata())
+    if len(D.shape) > 1:
+        D = numpy.array(I.getdata())[:,0]
+    D = D.reshape((I.size[1],I.size[0]))
+    D = D[:,:]/255.
+    D = D.round()
+    D = numpy.int16(D)
+    return D
 
 def get_png_mask(filename):
     import Image
