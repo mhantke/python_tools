@@ -232,8 +232,8 @@ def downsample(array2d0,factor0,mode="pick",mask2d0=None,bad_bits=None,min_N_pix
         else:
             return array2d_new
     elif mode == "integrate": # non-conservative if mask is given
-        Nx_new = int(numpy.ceil(Nx/factor))
-        Ny_new = int(numpy.ceil(Ny/factor))
+        Nx_new = int(numpy.ceil(Nx/float(factor)))
+        Ny_new = int(numpy.ceil(Ny/float(factor)))
         Nx = Nx_new * factor
         Ny = Ny_new * factor
         A = numpy.zeros(shape=(Ny,Nx),dtype=array2d.dtype)
