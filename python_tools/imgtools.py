@@ -919,7 +919,7 @@ def pixel_translation(A,t,order=1):
 
 # should be done with stsci.image package in the future
 def upsample(A,f0,order=1):
-    if A.dtype == "complex64":
+    if str(A.dtype).find("complex") != -1:
         return (1.*upsample(A.real,f,order)+1.j*upsample(A.imag,f,order))
     from scipy import ndimage
     d = len(list(A.shape))
