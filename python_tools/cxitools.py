@@ -6,7 +6,7 @@
 # Email: maxhantke@gmail.com
 
 
-from pylab import *
+#from pylab import *
 import h5py,os,numpy,time
 
 # CXI pixelmask bits

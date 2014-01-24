@@ -5,7 +5,7 @@
 # Author: Max Hantke
 # Email: maxhantke@gmail.com
 
-import os,re,sys,h5py,pylab,numpy,time,cmath
+import os,re,sys,h5py,numpy,time,cmath
 import logging
 logger = logging.getLogger("imgtools")
 import cxitools
@@ -21,36 +21,36 @@ def get_R_and_Theta_map(Nx,Ny,cx=None,cy=None):
         cx = (Nx-1)/2.0
     if not cy:
         cy = (Ny-1)/2.0
-    x = pylab.arange(0,Nx,1.0)-cx
-    y = pylab.arange(0,Ny,1.0)-cy
-    X,Y = pylab.meshgrid(x,y)
-    R = pylab.sqrt(X**2+Y**2)
+    x = numpy.arange(0,Nx,1.0)-cx
+    y = numpy.arange(0,Ny,1.0)-cy
+    X,Y = numpy.meshgrid(x,y)
+    R = numpy.sqrt(X**2+Y**2)
     R = R.round()
-    Theta = pylab.arctan(-Y/(X+pylab.finfo('float64').eps))
-    Theta[X<0] += pylab.pi
-    Theta += pylab.pi/2.0
-    #pylab.imsave("Theta.png" , Theta)
-    #pylab.imsave("X.png" , X)
-    #pylab.imsave("Y.png" , Y)
+    Theta = numpy.arctan(-Y/(X+numpy.finfo('float64').eps))
+    Theta[X<0] += numpy.pi
+    Theta += numpy.pi/2.0
+    #numpy.imsave("Theta.png" , Theta)
+    #numpy.imsave("X.png" , X)
+    #numpy.imsave("Y.png" , Y)
     return [R,Theta]
 
 def cone_pixel_average(image,N_theta,cx=None,cy=None):
     [R,Theta] = get_R_and_Theta_map(image.shape[1],image.shape[0],cx,cy)
-    R[pylab.isfinite(image) == False] = -1
-    radii = pylab.arange(R.min(),R.max()+1,1)
+    R[numpy.isfinite(image) == False] = -1
+    radii = numpy.arange(R.min(),R.max()+1,1)
     if radii[0] == -1:
         radii = radii[1:]
-    values = pylab.zeros(shape=(N_theta,len(radii)))
+    values = numpy.zeros(shape=(N_theta,len(radii)))
     for j in range(0,N_theta):
-        theta_min = j/(1.0*N_theta)*2.0*pylab.pi
-        theta_max = (j+1)/(1.0*N_theta)*2.0*pylab.pi
+        theta_min = j/(1.0*N_theta)*2.0*numpy.pi
+        theta_max = (j+1)/(1.0*N_theta)*2.0*numpy.pi
         theta_center = (theta_max+theta_min)/2.0
         theta_interval = theta_max-theta_min
         theta_image = image[abs(Theta-theta_center)<=theta_interval/2.0]
         theta_R = R[abs(Theta-theta_center)<=theta_interval/2.0]
         for i in range(0,len(radii)):
             temp = theta_image[theta_R==radii[i]].copy()
-            temp = temp[pylab.isfinite(temp)]
+            temp = temp[numpy.isfinite(temp)]
             values[j,i] = temp.mean()
     return [radii,values]
 
@@ -72,17 +72,18 @@ def center_of_mass(img0,shifted=False):
             f[i,:] = numpy.fft.fftshift(f[i,:])[:]
         cm[i] = (f[i,:]*img[:]).sum()
         if debug:
+            import pylab
             pylab.imsave(this_folder+"/testdata/f%i.png" % i,f[i])
     return cm
 
 def cone_pixel_average_new(image,mask,N_theta,cx=None,cy=None,rdownsample=1):
     [R,Theta] = get_R_and_Theta_map(image.shape[1],image.shape[0],cx,cy)
-    radii = pylab.arange(0,R.max()+1,1*rdownsample)
-    values = pylab.zeros(shape=(N_theta,len(radii)))
-    Mvalues = pylab.zeros(shape=(N_theta,len(radii)))
+    radii = numpy.arange(0,R.max()+1,1*rdownsample)
+    values = numpy.zeros(shape=(N_theta,len(radii)))
+    Mvalues = numpy.zeros(shape=(N_theta,len(radii)))
     for j in range(0,N_theta):
-        theta_min = j/(1.0*N_theta)*2.0*pylab.pi
-        theta_max = (j+1)/(1.0*N_theta)*2.0*pylab.pi
+        theta_min = j/(1.0*N_theta)*2.0*numpy.pi
+        theta_max = (j+1)/(1.0*N_theta)*2.0*numpy.pi
         theta_center = (theta_max+theta_min)/2.0
         theta_interval = theta_max-theta_min
         Mtheta =abs(Theta-theta_center)<=theta_interval/2.0
@@ -102,16 +103,16 @@ def radial_pixel_sum(image,cx=None,cy=None):
         cx = (image.shape[1]-1)/2.0
     if not cy:
         cy = (image.shape[0]-1)/2.0
-    x = pylab.arange(0,image.shape[1],1.0)-cx
-    y = pylab.arange(0,image.shape[1],1.0)-cy
-    X,Y = pylab.meshgrid(x,y)
-    R = pylab.sqrt(X**2+Y**2)
+    x = numpy.arange(0,image.shape[1],1.0)-cx
+    y = numpy.arange(0,image.shape[1],1.0)-cy
+    X,Y = numpy.meshgrid(x,y)
+    R = numpy.sqrt(X**2+Y**2)
     R = R.round()
-    radii = pylab.arange(R.min(),R.max()+1,1)
-    values = pylab.zeros_like(radii)
+    radii = numpy.arange(R.min(),R.max()+1,1)
+    values = numpy.zeros_like(radii)
     for i in range(0,len(radii)):
         values[i] = image[R==radii[i]].sum()
-    return pylab.array([radii,values])
+    return numpy.array([radii,values])
 
 
 def cartesian_to_polar(data,N_theta=100,cx0=None,cy0=None,r_max0=None,order=0):
@@ -133,9 +134,9 @@ def cartesian_to_polar(data,N_theta=100,cx0=None,cy0=None,r_max0=None,order=0):
 
     def cartesian2polar(outcoords):
         ri,thetai = outcoords
-        theta = thetai/(1.*(N_theta-1))*2*pylab.pi
-        X = cx+ri*pylab.cos(theta)
-        Y = cy+ri*pylab.sin(theta)
+        theta = thetai/(1.*(N_theta-1))*2*numpy.pi
+        X = cx+ri*numpy.cos(theta)
+        Y = cy+ri*numpy.sin(theta)
         return (Y,X)
 
     data_polar = scipy.ndimage.geometric_transform(data, cartesian2polar,order=order,output_shape=(r_max,N_theta))
@@ -143,11 +144,11 @@ def cartesian_to_polar(data,N_theta=100,cx0=None,cy0=None,r_max0=None,order=0):
 
 
 def cartesian_to_radial(cartesian,N_theta):
-    return pylab.mean(cartesian_to_polar(cartesian,N_theta),1)
+    return numpy.mean(cartesian_to_polar(cartesian,N_theta),1)
 
 def draw_circle(Nx,Ny,diameter):
-    X,Y = pylab.meshgrid(pylab.arange(-Nx/2.0+0.5,Nx/2.0+0.5,1),pylab.arange(-Ny/2.0+0.5,Ny/2.0+0.5,1))
-    circle = pylab.sqrt(X**2+Y**2)    
+    X,Y = numpy.meshgrid(numpy.arange(-Nx/2.0+0.5,Nx/2.0+0.5,1),numpy.arange(-Ny/2.0+0.5,Ny/2.0+0.5,1))
+    circle = numpy.sqrt(X**2+Y**2)    
     circle[circle>diameter/2.0] = 0
     circle[circle!=0] = 1
     return circle
@@ -156,31 +157,31 @@ def gaussian_smooth(I,sm,precision=1.):
     N = 2*int(numpy.round(precision*sm))+1
     if len(I.shape) == 2:
         import scipy.signal
-        X,Y = pylab.meshgrid(pylab.arange(0,N,1),pylab.arange(0,N,1))
+        X,Y = numpy.meshgrid(numpy.arange(0,N,1),numpy.arange(0,N,1))
         X = X-N/2
         Y = Y-N/2
-        R = pylab.sqrt(X**2 + Y**2)
-        kernel = pylab.exp(R**2/(2.0*sm**2))
+        R = numpy.sqrt(X**2 + Y**2)
+        kernel = numpy.exp(R**2/(2.0*sm**2))
         kernel[abs(R)>N/2] = 0.
         kernel /= kernel.sum()
         Ism = scipy.signal.convolve2d(I,kernel,mode='same',boundary='fill')
         return Ism
     elif len(I.shape) == 1:
-        X = pylab.arange(0,N,1)
+        X = numpy.arange(0,N,1)
         X = X-(N-1)/2.
-        kernel = pylab.exp(X**2/(2.0*sm**2))
+        kernel = numpy.exp(X**2/(2.0*sm**2))
         kernel /= kernel.sum()
-        Ism = pylab.convolve(I,kernel,mode='same')
+        Ism = numpy.convolve(I,kernel,mode='same')
         return Ism
 
 def gaussian_smooth_2d1d(I,sm,precision=1.):
     N = 2*int(numpy.round(precision*sm))+1
     if len(I.shape) == 2:
         import scipy.signal
-        kernel = pylab.zeros(shape=(N,N))
-        X,Y = pylab.meshgrid(pylab.arange(0,N,1),pylab.arange(0,N,1))
+        kernel = numpy.zeros(shape=(N,N))
+        X,Y = numpy.meshgrid(numpy.arange(0,N,1),numpy.arange(0,N,1))
         X = X-N/2
-        kernel = pylab.exp(X**2/(2.0*sm**2))
+        kernel = numpy.exp(X**2/(2.0*sm**2))
         kernel /= kernel.sum()
         Ism = scipy.signal.convolve2d(I,kernel,mode='same',boundary='wrap')
         return Ism
@@ -189,14 +190,14 @@ def gaussian_smooth_2d1d(I,sm,precision=1.):
         return []
 
 def gaussian_sharpening(image,sigma):
-    imagefourier = pylab.fft2(image)
+    imagefourier = numpy.fft2(image)
     Ny = image.shape[0]
     Nx = image.shape[1]
-    X,Y = pylab.meshgrid(pylab.arange(-Nx/2.0+0.5,Nx/2.0+0.5,1.0),pylab.arange(-Ny/2.0+0.5,Ny/2.0+0.5,1.0))
-    gauss = 1/pylab.sqrt(2*pylab.pi*sigma**2)*pylab.exp(-(X**2+Y**2)/(2*sigma**2))
+    X,Y = numpy.meshgrid(numpy.arange(-Nx/2.0+0.5,Nx/2.0+0.5,1.0),numpy.arange(-Ny/2.0+0.5,Ny/2.0+0.5,1.0))
+    gauss = 1/numpy.sqrt(2*numpy.pi*sigma**2)*numpy.exp(-(X**2+Y**2)/(2*sigma**2))
     gauss = shift(gauss)
     imagefourier *= (1.0-gauss)
-    return pylab.ifft2(imagefourier)
+    return numpy.ifft2(imagefourier)
     
 def downsample(array2d0,factor0,mode="pick",mask2d0=None,bad_bits=None,min_N_pixels=1):
     available_modes = ["pick","integrate"]#,"interpolate"]
@@ -280,13 +281,13 @@ def downsample3d(array_raw,factor,mask):
     Nz = array_cp.shape[0]
     Ny = array_cp.shape[1]
     Nx = array_cp.shape[2]
-    Nz_new = int(pylab.ceil(1.0*Nz/factor))
-    Ny_new = int(pylab.ceil(1.0*Ny/factor))
-    Nx_new = int(pylab.ceil(1.0*Nx/factor))  
-    array_new = pylab.zeros(shape=(Nz_new,Ny_new,Nx_new),dtype=array_cp.dtype)
-    for z_new in pylab.arange(0,Nz_new,1):
-        for y_new in pylab.arange(0,Ny_new,1):
-            for x_new in pylab.arange(0,Nx_new,1):
+    Nz_new = int(numpy.ceil(1.0*Nz/factor))
+    Ny_new = int(numpy.ceil(1.0*Ny/factor))
+    Nx_new = int(numpy.ceil(1.0*Nx/factor))  
+    array_new = numpy.zeros(shape=(Nz_new,Ny_new,Nx_new),dtype=array_cp.dtype)
+    for z_new in numpy.arange(0,Nz_new,1):
+        for y_new in numpy.arange(0,Ny_new,1):
+            for x_new in numpy.arange(0,Nx_new,1):
                 z_min = z_new*factor
                 z_max = min([(z_new+1)*factor,Nz])
                 y_min = y_new*factor
@@ -328,7 +329,7 @@ def crop(pattern,cropLength,center='middle',bg=0):
     x_stop = x_start+cropLength
     y_stop = y_start+cropLength
 
-    patternCropped = pylab.ones(shape=(cropLength,cropLength),dtype=pattern.dtype)*bg
+    patternCropped = numpy.ones(shape=(cropLength,cropLength),dtype=pattern.dtype)*bg
     patternCropped = temp[y_start:y_stop,x_start:x_stop]
     return patternCropped
 
@@ -347,7 +348,7 @@ def crop_max_around_center(array2d,c0,c1):
 def diameter_extrema(image):
     N = 32
     polimage = cartesian_to_polar(image,N)
-    radii = pylab.zeros(N)
+    radii = numpy.zeros(N)
     for i in range(0,N):
         radii[i] = polimage[:,i].argmin()
     diameters = radii[:N/2]+radii[N/2:]
@@ -361,8 +362,8 @@ def shift(pattern,center=None):
     Nx = pattern.shape[1]
     if not center:
         center = [Ny/2,Nx/2]
-    center = pylab.array([int(pylab.ceil(center[0])),int(pylab.ceil(center[1]))])
-    patternShifted = pylab.zeros(shape=pattern.shape)
+    center = numpy.array([int(numpy.ceil(center[0])),int(numpy.ceil(center[1]))])
+    patternShifted = numpy.zeros(shape=pattern.shape)
     patternShifted[Ny-center[0]:,Nx-center[1]:] = pattern[:center[0],:center[1]]
     patternShifted[Ny-center[0]:,:Nx-center[1]] = pattern[:center[0],center[1]:]
     patternShifted[:Ny-center[0],Nx-center[1]:] = pattern[center[0]:,:center[1]]
@@ -378,15 +379,15 @@ def shift_back(pattern,center):
     return shift(pattern,new_center)
 
 def turncw(array2d):
-    array2d_turned = pylab.zeros_like(array2d)
+    array2d_turned = numpy.zeros_like(array2d)
     for x in range(0,len(array2d[0])):
         temp_list=list(array2d[:,x])
         temp_list.reverse()
-        array2d_turned[x,:] = pylab.array(temp_list,dtype=array2d.dtype).T
+        array2d_turned[x,:] = numpy.array(temp_list,dtype=array2d.dtype).T
     return array2d_turned
 
 def turnccw(array2d):
-    array2d_turned = pylab.zeros(shape=(array2d.shape[1],array2d.shape[0]),dtype=array2d.dtype)
+    array2d_turned = numpy.zeros(shape=(array2d.shape[1],array2d.shape[0]),dtype=array2d.dtype)
     N = len(array2d_turned)-1
     for x in range(0,len(array2d[0])):
         array2d_turned[N-x,:] = array2d[:,x].T
@@ -408,7 +409,7 @@ def turn180(img,cx=None,cy=None):
     y_stop = int(round(cy1+(Ny1-1)/2.))+1
     x_start = int(round(cx1-(Nx1-1)/2.))
     x_stop = int(round(cx1+(Nx1-1)/2.))+1
-    img_new = pylab.zeros(shape=(img.shape[0],img.shape[1]),dtype=img.dtype)
+    img_new = numpy.zeros(shape=(img.shape[0],img.shape[1]),dtype=img.dtype)
     #img_new = img.copy()
     img_new[y_start:y_stop,x_start:x_stop] = turnccw(turnccw(img[y_start:y_stop,x_start:x_stop]))
     return img_new
@@ -418,6 +419,7 @@ def test_turn180():
     os.system("mkdir %s" % outdir)
     os.system("rm %s/*" % outdir)
     A = get_test_image()
+    import pylab
     pylab.imsave("%s/image.png" % outdir,A)
     B = turn180(A,A.shape[1]/3.,2*A.shape[0]/3.)
     pylab.imsave("%s/image_turned.png" % outdir,B)
@@ -425,7 +427,7 @@ def test_turn180():
 def slide(img,dx=0,dy=0):
     if dx == 0 and dy == 0: imgout = img.copy()
     else:
-        imgout=pylab.zeros_like(img)
+        imgout=numpy.zeros_like(img)
         if dx > 0 and dy > 0: imgout[dy:,dx:] = img[:-dy,:-dx]
         elif dx < 0 and dy < 0: imgout[:dy,:dx] = img[-dy:,-dx:]
         elif dx < 0 and dy > 0: imgout[dy:,:dx] = img[:-dy,-dx:]
@@ -446,17 +448,17 @@ def turn180_(array2d,cx=None,cy=None):
 def horizontalmirr(array2d):
     array2d_mirrored = list(array2d.copy())
     array2d_mirrored.reverse()
-    array2d_mirrored = pylab.array(array2d_mirrored)
+    array2d_mirrored = numpy.array(array2d_mirrored)
     return array2d_mirrored
 
 # only for Nx=Ny=Nz
 def slice(dm3d,phi,theta,psi):
     #voxelcoordmatrix = get_voxel_coord_matrix(Nx,Ny,Nz)
     N = dm3d.shape[0]
-    dm2dslice = pylab.zeros(N**2)
-    X2,X1 = pylab.meshgrid(pylab.arange(-(N-1)/2.0,(N/2-1)/2.0,1.0),pylab.arange(-(N-1)/2.0,(N/2-1)/2.0,1.0))
-    X0 = pylab.zeros_like(X1)
-    coord_slice = pylab.array([X0,X1,X2])
+    dm2dslice = numpy.zeros(N**2)
+    X2,X1 = numpy.meshgrid(numpy.arange(-(N-1)/2.0,(N/2-1)/2.0,1.0),numpy.arange(-(N-1)/2.0,(N/2-1)/2.0,1.0))
+    X0 = numpy.zeros_like(X1)
+    coord_slice = numpy.array([X0,X1,X2])
     voxelcoordslice = _rotate_voxel_coord_slice(phi,theta,psi)
     for i in range(0,len(dm2dslice)):
         coord = voxelcoordslice[i]
@@ -478,7 +480,7 @@ def interpolate3d(dm3d,coord,interpolation="linear"):
     else:
         if interpolation == "linear":
             value = 0
-            cases = [pylab.floor,lambda x: 1.0 + pylab.floor(x)]
+            cases = [numpy.floor,lambda x: 1.0 + numpy.floor(x)]
             for x0_func in cases:
                 for x1_func in cases:
                     for x2_func in cases:
@@ -488,9 +490,9 @@ def interpolate3d(dm3d,coord,interpolation="linear"):
                             (1.0-abs(x2_func(x2) - x2))*\
                             dm3d[int(x0_func(x0)),int(x1_func(x1)),int(x2_func(x2))]
         elif interpolation == "nn":
-            x0_rounded = pylab.round_(x0) 
-            x1_rounded = pylab.round_(x1) 
-            x2_rounded = pylab.round_(x2) 
+            x0_rounded = numpy.round_(x0) 
+            x1_rounded = numpy.round_(x1) 
+            x2_rounded = numpy.round_(x2) 
             value = dm3d[int(x0_rounded),int(x1_rounded),int(x2_rounded)]
     return value
 
@@ -502,12 +504,12 @@ def pad_zeros(arr_orig,factor,shifted=False):
     Nx_new = int(round(Nx*factor))
     Nx_d = Nx_new-Nx
     Ny_d = Ny_new-Ny
-    arr_out = pylab.zeros(shape=(Ny_new,Nx_new),dtype=arr.dtype)
+    arr_out = numpy.zeros(shape=(Ny_new,Nx_new),dtype=arr.dtype)
     if not shifted:
-        arr = pylab.fftshift(arr)
+        arr = numpy.fftshift(arr)
     arr_out[Ny_d/2:Ny_d/2+Ny,Nx_d/2:Nx_d/2+Nx] = arr[:,:]
     if not shifted:
-        arr_out = pylab.fftshift(arr_out)
+        arr_out = numpy.fftshift(arr_out)
     return arr_out
 
 def fourier_upsample(arr_orig,factor,shifted=False):
@@ -522,12 +524,12 @@ def fourier_upsample(arr_orig,factor,shifted=False):
 
 def depixelate(arr_orig,factor,shifted=False):
     arr = arr_orig.copy()
-    farr = pylab.fft2(arr)
+    farr = numpy.fft2(arr)
     if shifted:
         pfarr = pad_zeros(farr,factor,False)
     else:
         pfarr = pad_zeros(farr,factor,True)
-    parr = pylab.ifft2(pylab.fftshift(pfarr))
+    parr = numpy.ifft2(numpy.fftshift(pfarr))
     return parr
 
 def splitx(img,x_split=None):
@@ -551,7 +553,7 @@ def stitch(img_in,splitposition,cx,cy,dx,dy):
     Nx_out = img_in.shape[1]+abs(dx)
     Nx_p1 = p1.shape[1]
     Ny_p = p1.shape[0]
-    img_out = pylab.zeros(shape=(Ny_out,Nx_out))
+    img_out = numpy.zeros(shape=(Ny_out,Nx_out))
     if dy>=0:
         img_out[:Ny_p,:Nx_p1] = p1[:,:]
         img_out[dy:,Nx_p1+dx:] = p2[:,:]
@@ -564,10 +566,10 @@ def resize2d(arr2d,dX_old,dX_new,X_new=None):
     from scipy.interpolate import interp2d
     from numpy import linspace
     if not X_new: X_new = arr2d.shape[1]
-    x,y = pylab.meshgrid(pylab.arange(0,arr2d.shape[0])*dX_old,pylab.arange(0,arr2d.shape[1])*dX_old)
+    x,y = numpy.meshgrid(numpy.arange(0,arr2d.shape[0])*dX_old,numpy.arange(0,arr2d.shape[1])*dX_old)
     newfunc = interp2d(x,y,arr2d,fill_value=0.0,kind='linear')
-    x_new = pylab.linspace(0,X_new*dX_new,dX_old/dX_new)
-    y_new = pylab.linspace(0,X_new*dX_new,dX_old/dX_new)
+    x_new = numpy.linspace(0,X_new*dX_new,dX_old/dX_new)
+    y_new = numpy.linspace(0,X_new*dX_new,dX_old/dX_new)
     map2d_resized = newfunc(x_new,y_new)
     return map2d_resized
 
@@ -575,38 +577,38 @@ def interpolate3d(arr3d,factor):
     import enthought.mayavi.mlab as m
     N = arr3d.shape[0]
     arr3d_new = arr3d.copy()
-    farr3d = pylab.fftn(arr3d_new)
-    farr3d = pylab.fftshift(farr3d)
-    farr3d_new = pylab.zeros(shape=(N*factor,N*factor,N*factor),dtype="complex")
+    farr3d = numpy.fftn(arr3d_new)
+    farr3d = numpy.fftshift(farr3d)
+    farr3d_new = numpy.zeros(shape=(N*factor,N*factor,N*factor),dtype="complex")
     farr3d_new[round((N*factor-N)/2.0):round((N*factor-N)/2.0)+N,
                round((N*factor-N)/2.0):round((N*factor-N)/2.0)+N,
                round((N*factor-N)/2.0):round((N*factor-N)/2.0)+N] = farr3d[:,:,:]
     farr3d = farr3d_new
-    farr3d = pylab.fftshift(farr3d)
-    arr3d_new = pylab.ifftn(farr3d)
+    farr3d = numpy.fftshift(farr3d)
+    arr3d_new = numpy.ifftn(farr3d)
     return arr3d_new
 
 def smooth1d(arr1d,sm):
     N = 1+2*sm
-    x = pylab.arange(0,N,1) - sm
-    kernel = pylab.zeros(N)
-    kernel = pylab.exp(x**2/(1.0*sm**2))
-    arr1d_new = pylab.convolve(arr1d,kernel,'same')
+    x = numpy.arange(0,N,1) - sm
+    kernel = numpy.zeros(N)
+    kernel = numpy.exp(x**2/(1.0*sm**2))
+    arr1d_new = numpy.convolve(arr1d,kernel,'same')
     return arr1d_new
 
 def smooth3d(arr3d,factor):
     import enthought.mayavi.mlab as m
     N = arr3d.shape[0]
     arr3d_new = arr3d.copy()
-    farr3d = pylab.fftn(arr3d_new)
-    farr3d = pylab.fftshift(farr3d)
-    X,Y,Z = pylab.mgrid[-N/2:-N/2+N,-N/2:-N/2+N,-N/2:-N/2+N]
-    #R = pylab.sqrt(X**2+Y**2+Z**2)
+    farr3d = numpy.fftn(arr3d_new)
+    farr3d = numpy.fftshift(farr3d)
+    X,Y,Z = numpy.mgrid[-N/2:-N/2+N,-N/2:-N/2+N,-N/2:-N/2+N]
+    #R = numpy.sqrt(X**2+Y**2+Z**2)
     farr3d[abs(X)>N/2] = 0
     farr3d[abs(Y)>N/2] = 0
     farr3d[abs(Y)>N/2] = 0
-    farr3d = pylab.fftshift(farr3d)
-    arr3d_new = pylab.ifftn(farr3d)
+    farr3d = numpy.fftshift(farr3d)
+    arr3d_new = numpy.ifftn(farr3d)
     return arr3d_new
 
 def downsample3d_fourier(arr3d,factor):
@@ -614,43 +616,43 @@ def downsample3d_fourier(arr3d,factor):
     N = arr3d.shape[0]
     N_new = round(N*factor/2.0)*2
     arr3d_new = arr3d.copy()
-    farr3d = pylab.fftn(arr3d_new)
-    farr3d = pylab.fftshift(farr3d)
+    farr3d = numpy.fftn(arr3d_new)
+    farr3d = numpy.fftshift(farr3d)
     A = farr3d.sum()
     farr3d = farr3d[(N-N*factor)/2:(N-N*factor)/2+N_new,(N-N*factor)/2:(N-N*factor)/2+N_new,(N-N*factor)/2:(N-N*factor)/2+N_new]
     B = farr3d.sum()
     farr3d /= (N/(1.0*N_new))**3.0
-    farr3d = pylab.fftshift(farr3d)
-    arr3d_new = pylab.ifftn(farr3d)
+    farr3d = numpy.fftshift(farr3d)
+    arr3d_new = numpy.ifftn(farr3d)
     return arr3d_new
 
 def downsample2d_fourier(arr2d,factor):
     N = arr2d.shape[0]
     N_new = round(N*factor/2.0)*2
     arr2d_new = arr2d.copy()
-    farr2d = pylab.fftn(arr2d_new)
-    farr2d = pylab.fftshift(farr2d)
+    farr2d = numpy.fftn(arr2d_new)
+    farr2d = numpy.fftshift(farr2d)
     A = farr2d.sum()
     farr2d = farr2d[(N-N*factor)/2:(N-N*factor)/2+N_new,(N-N*factor)/2:(N-N*factor)/2+N_new]
     B = farr2d.sum()
     farr2d /= (N/(1.0*N_new))**2.0
-    farr2d = pylab.fftshift(farr2d)
-    arr2d_new = pylab.ifftn(farr2d)
+    farr2d = numpy.fftshift(farr2d)
+    arr2d_new = numpy.ifftn(farr2d)
     return arr2d_new
 
 def interpolate2d(arr2d,factor):
     N = arr2d.shape[0]
     arr2d_new = arr2d.copy()
-    farr2d = pylab.fftn(arr2d_new)
-    farr2d = pylab.fftshift(farr2d)
-    farr2d_new = pylab.zeros(shape=(N*factor,N*factor),dtype="complex")
+    farr2d = numpy.fftn(arr2d_new)
+    farr2d = numpy.fftshift(farr2d)
+    farr2d_new = numpy.zeros(shape=(N*factor,N*factor),dtype="complex")
     farr2d_new[round((N*factor-N)/2.0):round((N*factor-N)/2.0)+N,
                round((N*factor-N)/2.0):round((N*factor-N)/2.0)+N] = farr2d[:,:]
     farr2d = farr2d_new
-    farr2d = pylab.fftshift(farr2d)
-    arr2d_new = pylab.ifftn(farr2d)
-    #pylab.figure()
-    #pylab.imshow(pylab.log10(farr2d.real))
+    farr2d = numpy.fftshift(farr2d)
+    arr2d_new = numpy.ifftn(farr2d)
+    #numpy.figure()
+    #pylab.imshow(numpy.log10(farr2d.real))
     #pylab.imshow(arr2d_new.real)
     #pylab.show()
     return arr2d_new
@@ -658,21 +660,21 @@ def interpolate2d(arr2d,factor):
 def interpolate1d(arr1d,factor):
     N = len(arr1d)
     arr1d_new = arr1d.copy()
-    farr1d = pylab.fftn(arr1d_new)
-    farr1d = pylab.fftshift(farr1d)
-    farr1d_new = pylab.zeros(N*factor,dtype="complex")
+    farr1d = numpy.fftn(arr1d_new)
+    farr1d = numpy.fftshift(farr1d)
+    farr1d_new = numpy.zeros(N*factor,dtype="complex")
     farr1d_new[round((N*factor-N)/2.0):round((N*factor-N)/2.0)+N] = farr1d[:]
     farr1d = farr1d_new
-    farr1d = pylab.fftshift(farr1d)
-    arr1d_new = pylab.ifftn(farr1d)*factor
-    #pylab.figure()
+    farr1d = numpy.fftshift(farr1d)
+    arr1d_new = numpy.ifftn(farr1d)*factor
+    #numpy.figure()
     #pylab.imshow(pylab.log10(farr2d.real))
     #pylab.imshow(arr2d_new.real)
     #pylab.show()
     return arr1d_new
 
 def put_besides(img1,img2):
-    img3 = pylab.zeros(shape=(max([img1.shape[0],img2.shape[0]]),img1.shape[1]+img2.shape[1]))
+    img3 = numpy.zeros(shape=(max([img1.shape[0],img2.shape[0]]),img1.shape[1]+img2.shape[1]))
     img3[:img1.shape[0],:img1.shape[1]] = img1[:,:]
     img3[:img2.shape[0]:,img1.shape[1]:] = img2[:,:]
     return img3
@@ -691,14 +693,14 @@ def _radial(image,mode="mean",**kwargs):
     else: cy = (image.shape[0]-1)/2.0
     R = get_R_and_Theta_map(image.shape[1],image.shape[0],cx,cy)[0]
     R = R.round()
-    R[pylab.isfinite(image)==False] = -1
-    radii = pylab.arange(R.min(),R.max()+1,1)
+    R[numpy.isfinite(image)==False] = -1
+    radii = numpy.arange(R.min(),R.max()+1,1)
     if radii[0] == -1:
         radii = radii[1:]
-    values = pylab.zeros_like(radii)
+    values = numpy.zeros_like(radii)
     for i in range(0,len(radii)):
         values[i] = f(image[R==radii[i]])
-    if 'rout' in kwargs: return pylab.array([radii,values])
+    if 'rout' in kwargs: return numpy.array([radii,values])
     else: return values
 def radial_sum(image,**kwargs):
     return _radial(image,"sum",**kwargs)
@@ -768,8 +770,8 @@ def radial_mean_fast(image,**kwargs):
 #    return I_recentered
 
 def recenter(I,cx,cy,order=1):
-    dx = int(pylab.ceil(cx-(I.shape[1]-1)/2.))
-    dy = int(pylab.ceil(cy-(I.shape[0]-1)/2.))
+    dx = int(numpy.ceil(cx-(I.shape[1]-1)/2.))
+    dy = int(numpy.ceil(cy-(I.shape[0]-1)/2.))
     return pixel_translation(I,[dy,dx],order)
 
 def downsample_position(position,downsampling):
@@ -791,7 +793,7 @@ def pair_correlation(I,M0=None):
     for dy in range(Ny):
         if M[dy,:].sum() > 1:
             Iy = I[dy,:][M[dy,:]]
-            Im[dy,:] = (I[dy,:]-Iy.mean())/(Iy.std()+pylab.finfo('float64').eps)
+            Im[dy,:] = (I[dy,:]-Iy.mean())/(Iy.std()+numpy.finfo('float64').eps)
     for dx in range(Nx):
         for ix in range(Nx):
             m = M[:,ix]*M[:,(ix+dx)%Nx]
@@ -809,6 +811,7 @@ def test_pair_correlation():
         img = numpy.sin(2*numpy.pi/(10.)*X)
         msk = numpy.ones(shape=img.shape,dtype="bool")
         CI,CM = pair_correlation(img,msk)
+    import pylab
     pylab.clf()
     outfolder = "./testdata/"
     pylab.plot(CI.sum(0))
@@ -850,12 +853,13 @@ def test_radial_pair_correlation():
         I.set_sample_icosahedral_virus_map(225E-09)
         I.sample.set_random_orientation()
         O = p.propagator(I)
-        img = pylab.poisson(O.get_intensity_pattern())
+        img = numpy.poisson(O.get_intensity_pattern())
         msk = I.detector.mask
         cx =  I.detector.cx
         cy = I.detector.cy
         CI,CM = radial_pair_correlation(img,msk,cx,cy)
     Ip = cartesian_to_polar(img,100,cx,cy)
+    import pylab
     pylab.imsave("testdata/%s_img.png" % name,img*numpy.log10(msk*10))
     pylab.imsave("testdata/%s_Ip.png" % name,Ip)
     pylab.imsave("testdata/%s_PC.png" % name,CI*numpy.log10(CM*10))
@@ -873,7 +877,7 @@ def get_test_image():
     filename = os.path.dirname(os.path.realpath(__file__)) + "/testdata/testmax_gray.png"
     I = Image.open(filename)
     Nx,Ny = I.size
-    D = pylab.array(I.getdata())[:]
+    D = numpy.array(I.getdata())[:]
     D=D.reshape((Ny,Nx))
     return D    
 
@@ -915,7 +919,7 @@ def pixel_translation(A,t,order=1):
 
 # should be done with stsci.image package in the future
 def upsample(A,f0,order=1):
-    if A.dtype == "complex64":
+    if str(A.dtype).find("complex") != -1:
         return (1.*upsample(A.real,f,order)+1.j*upsample(A.imag,f,order))
     from scipy import ndimage
     d = len(list(A.shape))
@@ -943,6 +947,7 @@ def fourier_translation(A,t,rotation=False):
     return A_translated
 
 def fourier_translation_test():
+    import pylab
     A = get_test_image()
     pylab.imsave("testdata/fourier_translation_test_A.png",A,cmap=pylab.cm.gray)
     B = fourier_translation(A,[45,34])
@@ -1125,9 +1130,9 @@ def minimize_phase_ramp(img,shifted=False,periodic_boundary=False):
 def phase_match(imgA,imgB,weights=None): # typically weights = (abs(imgA)*abs(imgB))
     diff = numpy.angle(imgA)-numpy.angle(imgB)
     if weights == None:
-        w = 1/(1.*len(diff.flatten()) + pylab.finfo('float64').eps)
+        w = 1/(1.*len(diff.flatten()) + numpy.finfo('float64').eps)
     else:
-        w = weights / (weights.sum() + pylab.finfo('float64').eps)
+        w = weights / (weights.sum() + numpy.finfo('float64').eps)
     return (diff*w).sum()
 
 
@@ -1286,7 +1291,7 @@ def prtf(imgs0,msks0,**kwargs):
 def half_period_resolution(PRTF,pixel_edge_length,detector_distance,wavelength,cx=None,cy=None):
     # angular average of PRTF
     [r,PRTFr] = radial_mean(PRTF,cx=cx,cy=cy,rout=True)
-    dx = wavelength/2./(pylab.sin(pylab.arctan(r*pixel_edge_length/detector_distance))+pylab.finfo('float64').eps)
+    dx = wavelength/2./(numpy.sin(numpy.arctan(r*pixel_edge_length/detector_distance))+numpy.finfo('float64').eps)
     success = PRTFr > (1./numpy.e)
     if success.sum() == len(success):
         i = -1
