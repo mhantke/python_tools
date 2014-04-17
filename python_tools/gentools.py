@@ -8,6 +8,14 @@
 import numpy,os,re,csv,string,time,datetime,logging
 logger = logging.getLogger("pythontools")
 
+DICT_physical_constants = {'e':1.60217657E-19,
+                           'c':299792458.,
+                           'h':6.62606957E-34,
+                           're':2.8179403267E-15,
+                           'barn':1E-28,
+                           'u':1.66053886E-27}
+
+
 # in_filter can be a string or a list of strings
 def get_filenames(in_filter=None,path="./"):
     filenames = os.popen('ls %s' % path).readlines()
@@ -416,7 +424,19 @@ class Configuration:
                 if variableName not in self.confDict[section].keys():
                     self.confDict[section][variableName] = defaultDict[section][variableName]
                     logger.info("Add variable %s with default value %s to configuration section %s as variable did not exist." % (variableName,str(defaultDict[section][variableName]),section))
-              
+
+    def write_to_file(self,filename):
+        ls = ["# Configuration file\n# Automatically written by Configuration instance\n\n"]
+        for section_name,section in self.confDict.items():
+            if isinstance(section,dict):
+                ls.append("[%s]\n" % section_name)
+                for variable_name,variable in section.items():
+                    ls.append("%s=%s\n" % (variable_name,str(variable)))
+                ls.append("\n")
+        s = open(filename,"w")
+        s.writelines(ls)
+        s.close()        
+
 def mkdir_timestamped(dirname):
     ts = time.time()
     time_string = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d_%H%M%S')
