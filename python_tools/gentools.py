@@ -8,6 +8,14 @@
 import numpy,os,re,csv,string,time,datetime,logging
 logger = logging.getLogger("pythontools")
 
+DICT_physical_constants = {'e':1.60217657E-19,
+                           'c':299792458.,
+                           'h':6.62606957E-34,
+                           're':2.8179403267E-15,
+                           'barn':1E-28,
+                           'u':1.66053886E-27}
+
+
 # in_filter can be a string or a list of strings
 def get_filenames(in_filter=None,path="./"):
     filenames = os.popen('ls %s' % path).readlines()
@@ -419,8 +427,7 @@ class Configuration:
                 ls.append("\n")
         s = open(filename,"w")
         s.writelines(ls)
-        s.close()
-
+        s.close()        
 
 def mkdir_timestamped(dirname):
     ts = time.time()
