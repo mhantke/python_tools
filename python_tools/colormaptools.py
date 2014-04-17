@@ -117,13 +117,42 @@ cmaps["grayalpha"] = matplotlib.colors.LinearSegmentedColormap('grayalpha', cdic
 
 
 
-def make_colorbar(filename,Nx,Ny,colormap=cm.jet,orientation="vertical"):
-    X,Y = meshgrid(arange(Nx),arange(Ny))
+#def make_colorbar(filename,Nx,Ny,colormap=cm.jet,orientation="vertical"):
+#    X,Y = meshgrid(arange(Nx),arange(Ny))
+#    if orientation == "vertical":
+#        C = -Y
+#    else:
+#        C = X
+#    imsave(filename,C,cmap=colormap)
+
+def make_colorbar(filename,**kwargs):
+    from matplotlib import pyplot
+    import matplotlib as mpl
+    cmap = kwargs.get("cmap",cm.jet)
+    label= kwargs.get("label","")
+    vmin = kwargs.get("vmin",None)
+    vmax = kwargs.get("vmax",None)
+    Nx = kwargs.get("Nx",100)
+    Ny = kwargs.get("Ny",400)
+    scaling = kwargs.get("scaling","linear")
+    orientation = kwargs.get("orientation","vertical")
+    fig = pyplot.figure(figsize=(Nx/100.,Ny/100.))
     if orientation == "vertical":
-        C = -Y
+        ax = fig.add_axes([0.15, 0.1, 0.15, 0.8])
     else:
-        C = X
-    imsave(filename,C,cmap=colormap)
+        ax = fig.add_axes([0.1, 0.15, 0.8, 0.15])
+    if scaling == "linear":
+        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+    if scaling == "log":
+        if vmin <= 0 or vmin == None:
+            vmin = .1
+        if vmax <= 0 or vmax == None:
+            vmax = 10
+        norm = mpl.colors.LogNorm(vmin=vmin, vmax=vmax)
+    cb = mpl.colorbar.ColorbarBase(ax,cmap=cmap,norm=norm,orientation=orientation)
+    cb.set_label(label)
+    pyplot.savefig(filename,dpi=100)
+
 
 def complex_array_to_rgb(X, theme='dark', rmax=None):
     '''Takes an array of complex number and converts it to an array of [r, g, b],
