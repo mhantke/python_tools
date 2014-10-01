@@ -316,7 +316,7 @@ def crop(pattern,cropLength,center='middle',bg=0):
         temp = pattern.copy()
     else:
         if center == "center_of_mass":
-            [y_center,x_center] = center_of_mass(pattern)
+            [y_center,x_center] = center_of_mass(pattern,True)
             x_center = numpy.ceil(pattern.shape[0]/2.) + x_center
             y_center = numpy.ceil(pattern.shape[0]/2.) + y_center
         else:
@@ -398,11 +398,15 @@ def fft_turn180(I):
 
 def turn180(img,cx=None,cy=None):
     if cx == None:
-        cx1 = (img.shape[0]-1)/2
+        cx0 = (img.shape[0]-1)/2
+    else:
+        cx0 = cx
     if cy == None:
-        cy1 = (img.shape[0]-1)/2
-    cx1 = round(cx*2)/2.
-    cy1 = round(cy*2)/2.
+        cy0 = (img.shape[0]-1)/2
+    else:
+        cy0 = cy0
+    cx1 = round(cx0*2)/2.
+    cy1 = round(cy0*2)/2.
     Nx1 = int(2*min([cx1,img.shape[1]-1-cx1]))+1
     Ny1 = int(2*min([cy1,img.shape[0]-1-cy1]))+1
     y_start = int(round(cy1-(Ny1-1)/2.))
@@ -1401,8 +1405,8 @@ def half_pixel_downsampling(img0,msk0,downsampling=2,mode="conservative",cx=None
         
     return [imgXxX0,mskXxX0,imgXxX1,mskXxX1]
 
-
-def array_to_array(A1,A2,p0=None,origin="corner",mode="sum",fill_value=0.):
+# A1 is added to A2
+def array_to_array(A1,A2,p0=None,origin="corner",mode="sum",fill_value=0.,factor=1.):
     N1 = numpy.array(A1.shape)
     N2 = numpy.array(A2.shape)
     d = len(N1)
@@ -1422,7 +1426,6 @@ def array_to_array(A1,A2,p0=None,origin="corner",mode="sum",fill_value=0.):
     p_min = numpy.int16((p-N1/2).round())
     p_max = p_min + N1
     print p_min,p_max
-    A2_new = A2.copy()
     N2_new = N2.copy()
     origin_offset = numpy.zeros(d)
     for di in range(d):
@@ -1431,12 +1434,16 @@ def array_to_array(A1,A2,p0=None,origin="corner",mode="sum",fill_value=0.):
             N2_new[di] += offset
             p_min[di] += offset
             p_max[di] += offset
-        if p_max[di] >= N2[di]:
-            N2_new[di] = p_max[di]+1
-    A2_new = numpy.zeros(shape=tuple(N2_new),dtype=A2.dtype) + fill_value
+        if p_max[di] > N2[di]:
+            N2_new[di] = p_max[di]
+    A2_new = A2.copy()
+    #A2_new = numpy.zeros(shape=tuple(N2_new),dtype=A2.dtype) + fill_value
     print p_min,p_max
     if mode == "sum": f = lambda a,b: a+b
     elif mode == "replace": f = lambda a,b: b
+    elif mode == "max": f = lambda a,b: (a>=b)*a+(b>a)*b
+    elif mode == "min": f = lambda a,b: (a<=b)*a+(b<a)*b
+    elif mode == "factor": f = lambda a,b: a*(1-b)+b*factor
     else: logger.error("%s is not a valid mode." % mode)
     if d == 1:
         A2_new[p_min[0]:p_max[0]] = f(A2_new[p_min[0]:p_max[0]],A1[:])

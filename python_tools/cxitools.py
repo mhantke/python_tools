@@ -48,12 +48,12 @@ class CXIWriter:
             self.logger.debug("Write dataset %s of event %i." % (name,i))
         if name not in self.f:
             t0 = time.time()
-            if isscalar(data):
+            if numpy.isscalar(data):
                 if i == -1:
                     s = [1]
                 else:
                     s= [self.N]
-                t=dtype(type(data))
+                t=numpy.dtype(type(data))
                 if t == "S":
                     t = h5py.new_vlen(str)
                 axes = "experiment_identifier:value"
@@ -70,12 +70,12 @@ class CXIWriter:
                 self.logger.debug("Create dataset %s within %.1f sec.",name,t1-t0)
 
         if i == -1:
-            if isscalar(data):
+            if numpy.isscalar(data):
                 self.f[name][0] = data
             else:
                 self.f[name][:] = data[:]
         else:
-            if isscalar(data):
+            if numpy.isscalar(data):
                 self.f[name][i] = data
             else:
                 self.f[name][i,:] = data[:]
@@ -377,5 +377,7 @@ def write_sigma_map(filename_cheetah,scale=1.):
         print i,s[0]
         fc["/sigma_map/data"][i,:,:] = (electronics_sigma+H[:N,:N]+((M[i,:N,:N] & PIXEL_IS_ARTIFACT_CORRECTED) != 0)*artifact_sigma)*scale
     fc.close()
+
+
 
 

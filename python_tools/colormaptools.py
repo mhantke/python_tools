@@ -117,13 +117,13 @@ cmaps["grayalpha"] = matplotlib.colors.LinearSegmentedColormap('grayalpha', cdic
 
 
 
-#def make_colorbar(filename,Nx,Ny,colormap=cm.jet,orientation="vertical"):
-#    X,Y = meshgrid(arange(Nx),arange(Ny))
-#    if orientation == "vertical":
-#        C = -Y
-#    else:
-#        C = X
-#    imsave(filename,C,cmap=colormap)
+def make_colorbar_blank(filename,Nx,Ny,colormap=cm.jet,orientation="vertical"):
+    X,Y = meshgrid(arange(Nx),arange(Ny))
+    if orientation == "vertical":
+        C = -Y
+    else:
+        C = X
+    imsave(filename,C,cmap=colormap)
 
 def make_colorbar(filename,**kwargs):
     from matplotlib import pyplot
@@ -134,6 +134,7 @@ def make_colorbar(filename,**kwargs):
     vmax = kwargs.get("vmax",None)
     Nx = kwargs.get("Nx",100)
     Ny = kwargs.get("Ny",400)
+    dpi= kwargs.get("dpi",400)
     scaling = kwargs.get("scaling","linear")
     orientation = kwargs.get("orientation","vertical")
     fig = pyplot.figure(figsize=(Nx/100.,Ny/100.))
@@ -151,7 +152,7 @@ def make_colorbar(filename,**kwargs):
         norm = mpl.colors.LogNorm(vmin=vmin, vmax=vmax)
     cb = mpl.colorbar.ColorbarBase(ax,cmap=cmap,norm=norm,orientation=orientation)
     cb.set_label(label)
-    pyplot.savefig(filename,dpi=100)
+    pyplot.savefig(filename,dpi=dpi)
 
 
 def complex_array_to_rgb(X, theme='dark', rmax=None):
@@ -164,8 +165,14 @@ def complex_array_to_rgb(X, theme='dark', rmax=None):
     if theme == 'light':
         Y[..., 1] = np.clip(np.abs(X) / absmax, 0, 1)
         Y[..., 2] = 1
+    elif theme == 'lightlog':
+        Y[..., 1] = np.log10(np.clip(10*(np.abs(X) / absmax*0.9+0.1), 1, 10))
+        Y[..., 2] = 1
     elif theme == 'dark':
         Y[..., 1] = 1
         Y[..., 2] = np.clip(np.abs(X) / absmax, 0, 1)
+    elif theme == 'darklog':
+        Y[..., 1] = 1
+        Y[..., 2] = np.log10(np.clip(10*(np.abs(X) / absmax*0.9+0.1), 1, 10))
     Y = matplotlib.colors.hsv_to_rgb(Y)
     return Y
