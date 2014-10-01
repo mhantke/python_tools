@@ -1425,7 +1425,7 @@ def array_to_array(A1,A2,p0=None,origin="corner",mode="sum",fill_value=0.,factor
         p = p1+origin
     p_min = numpy.int16((p-N1/2).round())
     p_max = p_min + N1
-    print p_min,p_max
+    #print p_min,p_max
     N2_new = N2.copy()
     origin_offset = numpy.zeros(d)
     for di in range(d):
