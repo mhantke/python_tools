@@ -1438,7 +1438,7 @@ def array_to_array(A1,A2,p0=None,origin="corner",mode="sum",fill_value=0.,factor
             N2_new[di] = p_max[di]
     A2_new = A2.copy()
     #A2_new = numpy.zeros(shape=tuple(N2_new),dtype=A2.dtype) + fill_value
-    print p_min,p_max
+    #print p_min,p_max
     if mode == "sum": f = lambda a,b: a+b
     elif mode == "replace": f = lambda a,b: b
     elif mode == "max": f = lambda a,b: (a>=b)*a+(b>a)*b
