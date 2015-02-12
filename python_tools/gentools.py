@@ -67,7 +67,10 @@ def get_png_mask(filename):
     try: 
         from pillow import Image
     except:
-        import Image
+        try:
+            import Image
+        except:
+            import image as Image
     I = Image.open(filename)
     D = numpy.array(I.getdata())
     if len(D.shape) > 1:

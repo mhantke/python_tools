@@ -64,7 +64,7 @@ class CXIWriter:
                 t=data.dtype
                 axes = "experiment_identifier:y:x"
             self.f.create_dataset(name,s,t)
-            self.f[name].attrs.modify("axes",axes)
+            self.f[name].attrs.modify("axes",[axes])
             t1 = time.time()
             if self.logger != None:
                 self.logger.debug("Create dataset %s within %.1f sec.",name,t1-t0)
