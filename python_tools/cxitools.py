@@ -63,7 +63,6 @@ class CXIWriter:
                     s.insert(0,self.N)
                 t=data.dtype
                 axes = "experiment_identifier:y:x"
-            print s
             self.f.create_dataset(name,s,t)
             self.f[name].attrs.modify("axes",[axes])
             t1 = time.time()
@@ -358,7 +357,6 @@ def write_sigma_map(filename_cheetah,scale=1.):
     fc = h5py.File(filename_cheetah,"r+")
     M = fc["/entry_1/image_2/mask"]
     H = fc["/cheetah/shared/detector0_class0_sigma_downsampled"]
-    print "opened data"
     electronics_sigma = 2.5
     artifact_sigma = 50.
     N = min([M.shape[1],M.shape[2]])
@@ -375,7 +373,6 @@ def write_sigma_map(filename_cheetah,scale=1.):
     except:
         print "Dataset already exists"
     for i in arange(s[0]):
-        print i,s[0]
         fc["/sigma_map/data"][i,:,:] = (electronics_sigma+H[:N,:N]+((M[i,:N,:N] & PIXEL_IS_ARTIFACT_CORRECTED) != 0)*artifact_sigma)*scale
     fc.close()
 
