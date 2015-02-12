@@ -34,7 +34,7 @@ class CXIWriter:
         self.f = h5py.File(filename,"w")
         self.N = N
         self.logger = logger
-    def write(self,d,prefix=""):
+    def write(self,d,prefix="",i=-1):
         for k in d.keys():
             name = prefix+"/"+k
             if isinstance(d[k],dict):
@@ -42,7 +42,7 @@ class CXIWriter:
                     self.f.create_group(name)
                 self.write(d[k],name)
             elif k != "i":
-                self.write_to_dataset(name,d[k],d.get("i",-1))
+                self.write_to_dataset(name,d[k],d.get("i",i))
     def write_to_dataset(self,name,data,i):
         if self.logger != None:
             self.logger.debug("Write dataset %s of event %i." % (name,i))
