@@ -63,6 +63,7 @@ class CXIWriter:
                     s.insert(0,self.N)
                 t=data.dtype
                 axes = "experiment_identifier:y:x"
+            print s
             self.f.create_dataset(name,s,t)
             self.f[name].attrs.modify("axes",[axes])
             t1 = time.time()
