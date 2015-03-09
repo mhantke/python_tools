@@ -410,7 +410,7 @@ def read_configfile(configfile):
 class Configuration:
     def __init__(self,config={},default={},verbose=False):
         self.verbose = verbose
-        
+        print "BLAAAAAAAAA"
         if isinstance(config,str):
             self.confDict = read_configfile(config)
             self.configfile = config
@@ -426,7 +426,6 @@ class Configuration:
     def set_unspecified_to_default(self,defaultDict):
         for section in defaultDict.keys():
             matched_sections = [s for s in self.confDict.keys() if section in s]
-            print matched_sections, "BLAAAAAAAAAAAAAAAAAAA"
             if matched_sections == []:
                 self.confDict[section] = {}
                 logger.info("Add section %s to configuration as it did not exist." % section)
