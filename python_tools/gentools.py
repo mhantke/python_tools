@@ -410,7 +410,6 @@ def read_configfile(configfile):
 class Configuration:
     def __init__(self,config={},default={},verbose=False):
         self.verbose = verbose
-        print "BLAAAAAAAAA"
         if isinstance(config,str):
             self.confDict = read_configfile(config)
             self.configfile = config
@@ -431,9 +430,9 @@ class Configuration:
                 logger.info("Add section %s to configuration as it did not exist." % section)
             for variableName in defaultDict[section].keys():
                 for ms in matched_sections:
-                    if variableName not in self.confDict[sm].keys():
-                        self.confDict[sm][variableName] = defaultDict[section][variableName]
-                        logger.info("Add variable %s with default value %s to configuration section %s as variable did not exist." % (variableName,str(defaultDict[section][variableName]),sm))
+                    if variableName not in self.confDict[ms].keys():
+                        self.confDict[ms][variableName] = defaultDict[section][variableName]
+                        logger.info("Add variable %s with default value %s to configuration section %s as variable did not exist." % (variableName,str(defaultDict[section][variableName]),ms))
 
     def write_to_file(self,filename):
         ls = ["# Configuration file\n# Automatically written by Configuration instance\n\n"]
