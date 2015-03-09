@@ -425,10 +425,11 @@ class Configuration:
     
     def set_unspecified_to_default(self,defaultDict):
         for section in defaultDict.keys():
-            if section not in self.confDict.keys():
+            matched_sections = [s for s in self.confDict.keys() if section in s]
+            if matched_sections == []
                 self.confDict[section] = {}
                 logger.info("Add section %s to configuration as it did not exist." % section)
-            matched_sections = [s for s in self.confDict.keys() if section in s]
+            print "conffffff"
             for ms in matched_sections:
                 for variableName in defaultDict[section].keys():
                     if variableName not in self.confDict[sm].keys():
