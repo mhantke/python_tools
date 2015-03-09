@@ -7,7 +7,7 @@
 
 
 #from pylab import *
-import h5py,os,numpy,time
+import h5py,os,numpy,time,sys
 
 # CXI pixelmask bits
 PIXEL_IS_PERFECT = 0
@@ -118,7 +118,7 @@ class CXIReader:
             sys.exit("ERROR: Not enough events to read. Change your configuration.")
         
         to_process = []
-        for N in self.Nevents_files: to_process.append(ones(N,dtype="bool"))
+        for N in self.Nevents_files: to_process.append(numpy.ones(N,dtype="bool"))
         to_process = self._filter_events(to_process,event_filters)
         to_process = self._pick_events(to_process,pick_events,ifirst,nevents)
         self.is_event_to_process = to_process
@@ -162,7 +162,7 @@ class CXIReader:
         return [directories,filenames]        
 
     def _pick_events(self,to_process,mode,ifirst,nevents):
-        temp = ones(self.Nevents_tot,dtype='bool')
+        temp = numpy.ones(self.Nevents_tot,dtype='bool')
         offset = 0
         for t in to_process:
             temp[offset:offset+len(t)] = t[:]        
@@ -181,7 +181,7 @@ class CXIReader:
         elif mode == 'random':
             to_pick_from = arange(self.Nevents_tot)
             to_pick_from = list(to_pick_from[temp])
-            temp = zeros_like(temp)
+            temp = numpy.zeros_like(temp)
             for i in range(nevents):
                 N = len(to_pick_from)
                 if N != 1:
@@ -213,7 +213,7 @@ class CXIReader:
                     if i != 0:
                         if self.logger != None:
                             self.logger.warning("Filter indices are applied to every file!")
-                    F = zeros_like(to_process[i])
+                    F = numpy.zeros_like(to_process[i])
                     if not isinstance(flt["indices"],list):
                         F[filter_ds == flt["indices"]] = True
                     else:
@@ -222,7 +222,7 @@ class CXIReader:
                 else:
                     if self.logger != None:
                         self.logger.warning("No valid filter arguments given for filter %s!" % flt_name)
-                    F = ones_like(to_process[i])
+                    F = numpy.ones_like(to_process[i])
                 to_process[i] *= F
                 if self.logger != None:
                     self.logger.info("Filter %s - yield %.3f %% -> total yield %.3f %%",flt_name,100.*F.sum()/len(F),100.*to_process[i].sum()/len(F))

@@ -8,14 +8,6 @@
 import numpy,os,re,csv,string,time,datetime,logging
 logger = logging.getLogger("pythontools")
 
-DICT_physical_constants = {'e':1.60217657E-19,
-                           'c':299792458.,
-                           'h':6.62606957E-34,
-                           're':2.8179403267E-15,
-                           'barn':1E-28,
-                           'u':1.66053886E-27}
-
-
 # in_filter can be a string or a list of strings
 def get_filenames(in_filter=None,path="./"):
     filenames = os.popen('ls %s' % path).readlines()
@@ -436,10 +428,12 @@ class Configuration:
             if section not in self.confDict.keys():
                 self.confDict[section] = {}
                 logger.info("Add section %s to configuration as it did not exist." % section)
-            for variableName in defaultDict[section].keys():
-                if variableName not in self.confDict[section].keys():
-                    self.confDict[section][variableName] = defaultDict[section][variableName]
-                    logger.info("Add variable %s with default value %s to configuration section %s as variable did not exist." % (variableName,str(defaultDict[section][variableName]),section))
+            matched_sections = [s for s in self.confDict.keys() if section in s]
+            for ms in matched_sections:
+                for variableName in defaultDict[section].keys():
+                    if variableName not in self.confDict[sm].keys():
+                        self.confDict[sm][variableName] = defaultDict[section][variableName]
+                        logger.info("Add variable %s with default value %s to configuration section %s as variable did not exist." % (variableName,str(defaultDict[section][variableName]),sm))
 
     def write_to_file(self,filename):
         ls = ["# Configuration file\n# Automatically written by Configuration instance\n\n"]

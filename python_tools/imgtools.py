@@ -398,13 +398,13 @@ def fft_turn180(I):
 
 def turn180(img,cx=None,cy=None):
     if cx == None:
-        cx0 = (img.shape[0]-1)/2
+        cx0 = (img.shape[1]-1)/2
     else:
         cx0 = cx
     if cy == None:
         cy0 = (img.shape[0]-1)/2
     else:
-        cy0 = cy0
+        cy0 = cy
     cx1 = round(cx0*2)/2.
     cy1 = round(cy0*2)/2.
     Nx1 = int(2*min([cx1,img.shape[1]-1-cx1]))+1
