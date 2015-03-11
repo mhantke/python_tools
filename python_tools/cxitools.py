@@ -42,7 +42,7 @@ class CXIWriter:
             if isinstance(d[k],dict):
                 if name not in self.f:
                     self.f.create_group(name)
-                self.write(d[k],name)
+                self.write(d[k],name,i)
             elif k != "i":
                 self.write_to_dataset(name,d[k],d.get("i",i))
     def write_to_dataset(self,name,data,i):
