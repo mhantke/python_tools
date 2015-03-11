@@ -406,11 +406,9 @@ def read_configfile(configfile):
                             c[key][i] = estimate_type(c[key][i]) 
                             if '$' in c[key]:
                                 c[key][i] = os.path.expandvars(c[key][i])
-                   else:
-                       if '$' in c[key]:
-                           c[key] = os.path.expandvars(c[key])
-                        
-
+                    else:
+                        if '$' in c[key]:
+                            c[key] = os.path.expandvars(c[key])
     return confDict
 
 class Configuration:
