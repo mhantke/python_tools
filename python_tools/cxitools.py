@@ -36,9 +36,9 @@ class CXIWriter:
         self.logger = logger
     def write(self,d,prefix="",i=-1):
         for k in d.keys():
-            if self.logger is not None:
-                self.logger.debug("Writing dataest %s",k)
             name = prefix+"/"+k
+            if self.logger is not None:
+                self.logger.debug("Writing dataest %s",name)
             if isinstance(d[k],dict):
                 if name not in self.f:
                     self.f.create_group(name)
@@ -46,7 +46,7 @@ class CXIWriter:
             elif k != "i":
                 self.write_to_dataset(name,d[k],d.get("i",i))
     def write_to_dataset(self,name,data,i):
-        if self.logger != None:
+        if self.logger is not None:
             self.logger.debug("Write dataset %s of event %i." % (name,i))
         if name not in self.f:
             print name
@@ -65,9 +65,9 @@ class CXIWriter:
                 s = list(data.shape)
                 ndims = len(s)
                 axes = "experiment_identifier"
-                if ndims == 1: axes += ":x"
-                elif ndims == 2: axes += ":y:x"
-                elif ndims == 3: axes += ":z:y:x"
+                if ndims == 2: axes = axes + ":x"
+                elif ndims == 3: axes = axes + ":y:x"
+                elif ndims == 4: axes = axes + ":z:y:x"
                 if i != -1:
                     s.insert(0,self.N)
                 t=data.dtype
