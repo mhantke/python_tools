@@ -58,11 +58,16 @@ class CXIWriter:
                     t = h5py.new_vlen(str)
                 axes = "experiment_identifier:value"
             else:
+                data = numpy.array(data)
                 s = list(data.shape)
+                ndims = len(s)
+                axes = "experiment_identifier"
+                if ndims == 1: axes += ":x"
+                elif ndims == 2: axes += ":y:x"
+                elif ndims == 3: axes += ":z:y:x"
                 if i != -1:
                     s.insert(0,self.N)
                 t=data.dtype
-                axes = "experiment_identifier:y:x"
             self.f.create_dataset(name,s,t)
             self.f[name].attrs.modify("axes",[axes])
             t1 = time.time()
