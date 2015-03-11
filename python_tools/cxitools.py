@@ -36,6 +36,8 @@ class CXIWriter:
         self.logger = logger
     def write(self,d,prefix="",i=-1):
         for k in d.keys():
+            if logger is not None:
+                logger.debug("Writing dataest %s",k)
             name = prefix+"/"+k
             if isinstance(d[k],dict):
                 if name not in self.f:
