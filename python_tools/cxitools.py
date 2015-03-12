@@ -49,7 +49,7 @@ class CXIWriter:
         if self.logger is not None:
             self.logger.debug("Write dataset %s of event %i." % (name,i))
         if name not in self.f:
-            print name
+            #print name
             t0 = time.time()
             if numpy.isscalar(data):
                 if i == -1:
