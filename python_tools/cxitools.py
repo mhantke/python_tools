@@ -86,8 +86,8 @@ class CXIWriter:
             if numpy.isscalar(data):
                 self.f[name][i] = data
             else:
-                print name,data,numpy.array(self.f[name]).shape
-                self.f[name][i,:] = numpy.array(data)[:]
+                #print name,data,numpy.array(self.f[name]).shape
+                self.f[name][i,:] = data[:]
     def close(self):
         self.f.close()
 
