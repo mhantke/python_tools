@@ -389,7 +389,8 @@ def dict_to_dict(dict_src,dict_dest):
         
 def read_configfile(configfile):
     import ConfigParser
-    config = ConfigParser.ConfigParser()
+    config = ConfigParser.RawConfigParser()
+    config.optionxform = str
 
     with open(configfile,"r") as f:
         config.readfp(f)
