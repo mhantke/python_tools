@@ -17,6 +17,7 @@ def worker_call(worker,pipe):
         work_package = pipe.recv()        
 
 def multiprocess(Nprocesses,Njobs,worker,getwork,logres=None,logger=None):
+    if Nprocesses > Njobs: Nprocesses = Njobs
     pipes_end_host = list(zeros(Nprocesses))
     pipes_end_worker = list(zeros(Nprocesses))
     processes = list(zeros(Nprocesses))

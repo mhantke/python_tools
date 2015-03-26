@@ -389,7 +389,9 @@ def dict_to_dict(dict_src,dict_dest):
         
 def read_configfile(configfile):
     import ConfigParser
-    config = ConfigParser.ConfigParser()
+    config = ConfigParser.RawConfigParser()
+    config.optionxform = str
+
     with open(configfile,"r") as f:
         config.readfp(f)
         confDict = {}
@@ -452,9 +454,10 @@ class Configuration:
         s.close()        
 
 def mkdir_timestamped(dirname):
+    d = dirname if dirname[-1] != "/" else dirname[:-1]
     ts = time.time()
     time_string = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d_%H%M%S')
-    real_dir = dirname+'_'+time_string
+    real_dir = d+'_'+time_string
     os.system('mkdir %s' % real_dir)
     return real_dir
 
