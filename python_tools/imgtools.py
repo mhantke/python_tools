@@ -318,7 +318,7 @@ def crop(pattern,cropLength,center='middle',bg=0):
         if center == "center_of_mass":
             [y_center,x_center] = center_of_mass(pattern,True)
             x_center = numpy.ceil(pattern.shape[0]/2.) + x_center
-            y_center = numpy.ceil(pattern.shape[0]/2.) + y_center
+            y_center = numpy.ceil(pattern.shape[1]/2.) + y_center
         else:
             x_center = center[1]
             y_center = center[0]

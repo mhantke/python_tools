@@ -101,6 +101,9 @@ class CXIReader:
         pick_events = kwargs.get("pick_events","in_sequence")
         event_filters = kwargs.get("event_filters",{})
         sorting_dsname = kwargs.get("sorting_dataset",None)
+        self.tag_nr = kwargs.get("sorting_tag_nr",None)
+        self.tags_hack = kwargs.get("tags_hack",False)
+        
         self.dsnames_single = kwargs.get("dsnames_single",None)
         self.dsnames_stack = dsnames_stack
 
@@ -136,6 +139,8 @@ class CXIReader:
         for N in to_process: self.Nevents_process += N.sum()
 
         self.order = self._set_order(to_process,sorting_dsname)
+
+        self._tags_hack_active = False
 
     def get_next(self):
         if self._next():
@@ -249,7 +254,11 @@ class CXIReader:
                     self.logger.debug("Set order of events in %s/%s",dty,fle)
                 f = h5py.File(dty+"/"+fle,"r")
                 sortdata = f[sorting_dsname]
-                order[i][:] = argsort(sortdata)[:]
+                if "tags" in sorting_dsname and self.tag_nr is not None:
+                    order[i][:] = numpy.argsort(sortdata)[self.tag_nr,:][::-1]
+                    order[i].sort()
+                else:
+                    order[i][:] = numpy.argsort(sortdata)[:]
                 f.close()
         return order
 
@@ -303,7 +312,10 @@ class CXIReader:
         if dsnames_stack != None:
             for (key,dsname) in dsnames_stack.items():
                 self.logger.debug(dsname)
-                D[key] = self.F[dsname][self.order[self.ifile][self.ievent_file]].copy()
+                if self.tags_hack and "tags" in key:
+                    D[key] = self.F[dsname][:,self.order[self.ifile][self.ievent_file]].copy()
+                else:
+                    D[key] = self.F[dsname][self.order[self.ifile][self.ievent_file]].copy()
         if dsnames_single != None:
             for (key,dsname) in dsnames_single.items():
                 self.logger.debug(dsname)
