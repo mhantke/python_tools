@@ -125,18 +125,9 @@ def make_colorbar_blank(filename,Nx,Ny,colormap=cm.jet,orientation="vertical"):
         C = X
     imsave(filename,C,cmap=colormap)
 
-def make_colorbar(filename,**kwargs):
+def make_colorbar(filename,vmin=None,vmax=None,label="",cmap=cm.jet,Nx=100,Ny=400,dpi=300,scaling="linear",orientation="vertical",transparent=False,color=None):
     from matplotlib import pyplot
     import matplotlib as mpl
-    cmap = kwargs.get("cmap",cm.jet)
-    label= kwargs.get("label","")
-    vmin = kwargs.get("vmin",None)
-    vmax = kwargs.get("vmax",None)
-    Nx = kwargs.get("Nx",100)
-    Ny = kwargs.get("Ny",400)
-    dpi= kwargs.get("dpi",400)
-    scaling = kwargs.get("scaling","linear")
-    orientation = kwargs.get("orientation","vertical")
     fig = pyplot.figure(figsize=(Nx/100.,Ny/100.))
     if orientation == "vertical":
         ax = fig.add_axes([0.15, 0.1, 0.15, 0.8])
@@ -152,7 +143,12 @@ def make_colorbar(filename,**kwargs):
         norm = mpl.colors.LogNorm(vmin=vmin, vmax=vmax)
     cb = mpl.colorbar.ColorbarBase(ax,cmap=cmap,norm=norm,orientation=orientation)
     cb.set_label(label)
-    pyplot.savefig(filename,dpi=dpi)
+    if color is not None:
+        cbytick_obj = pyplot.getp(cb.ax.axes, 'yticklabels')
+        pyplot.setp(cbytick_obj, color=color)
+        cb.outline.set_color(color)
+        pyplot.setp([cb.ax.axes.get_xticklines(), cb.ax.axes.get_yticklines()], color=color)
+    pyplot.savefig(filename,dpi=dpi,transparent=transparent)
 
 
 def complex_array_to_rgb(X, theme='dark', rmax=None):
