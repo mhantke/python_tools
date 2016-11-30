@@ -237,7 +237,7 @@ double_gaussian = lambda x,p1,p2: gaussian(x,p1[0],p1[1],p1[2])+gaussian(x,p2[0]
 def double_gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
     from scipy.optimize import leastsq
 
-    if xdata == None and ydata == None:
+    if xdata is None and ydata is None:
         # generate test data
         A01,A02 = 7.5,10.4
         mean1, mean2 = -5, 4.
@@ -245,7 +245,7 @@ def double_gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
         xdata =  numpy.linspace(-20, 20, 500)
         ydata = double_gaussian(xdata,[A01,mean1,std1],[A02,mean2,std2])
 
-    if p_init == None:
+    if p_init is None:
         p_A01, p_A02, p_mean1, p_mean2, p_sd1, p_sd2  = [ydata.max(),
                                                          ydata.max(),
                                                          xdata[len(xdata)/3],
@@ -282,7 +282,7 @@ def double_gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
 def gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
     from scipy.optimize import leastsq
     
-    if xdata == None and ydata == None:
+    if xdata is None and ydata is None:
         # Generate test data
         A0_test = 5.5
         x0_test = -2.
@@ -290,7 +290,7 @@ def gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
         xdata =  numpy.linspace(-20., 20., 500)
         ydata = gaussian(xdata,A0_test,x0_test,s_test)
 
-    if p_init == None:
+    if p_init is None:
         # Guess parameters
         A0_init, x0_init, s_init  = [ydata.max(),
                                      xdata[len(xdata)/2].mean(),
@@ -318,7 +318,7 @@ def gaussian_fit(xdata=None,ydata=None,p_init=None,show=False):
     return [p_result, yest]
 
 def bootstrap_gaussian_fit(xdata,ydata,p_init0=None,show=False,Nfract=0.5,n=100):
-    if p_init0 == None:
+    if p_init0 is None:
         p_init = gaussian_fit(xdata,ydata)[0]
     else:
         p_init = p_init0

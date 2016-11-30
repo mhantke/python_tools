@@ -55,7 +55,6 @@ def multiprocess(Nprocesses,Njobs,worker,getwork,logres=None,logger=None):
                     pipes_end_host[i].send(getwork())
                     Njobs_started += 1
 
-
         time.sleep(0.1)
 
     for i in range(Nprocesses):
